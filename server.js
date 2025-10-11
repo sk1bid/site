@@ -3,6 +3,7 @@ import os from "os";
 import si from "systeminformation";
 import path from "path";
 import net from "net";
+import dgram from "dgram";
 import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 
@@ -12,10 +13,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// ===== Раздаём React билд =====
+// ====== Раздача фронтенда (React / Vue / Svelte и т.д.) ======
 app.use(express.static(path.join(__dirname, "dist")));
 
-// ===== Форматирование аптайма =====
+// ====== Формат аптайма ======
 function formatUptime(seconds) {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -27,31 +28,64 @@ function formatUptime(seconds) {
   return parts.join(" ") || "менее минуты";
 }
 
-// ===== Проверка TCP-порта =====
-function checkPort(port, host = "192.168.0.120", timeout = 1000) {
+// ====== Проверка TCP / UDP портов ======
+function checkPort(port, host = "192.168.0.120", timeout = 1000, protocol = "tcp") {
   return new Promise((resolve) => {
-    const socket = new net.Socket();
     const start = Date.now();
 
-    socket.setTimeout(timeout);
-    socket
-      .once("connect", () => {
+    if (protocol === "udp") {
+      const socket = dgram.createSocket("udp4");
+      const msg = Buffer.from("ping");
+      let done = false;
+
+      socket.on("error", () => {
+        if (!done) resolve({ online: false, responseTime: null });
+        done = true;
+        socket.close();
+      });
+
+      socket.send(msg, 0, msg.length, port, host, (err) => {
+        if (err) {
+          if (!done) resolve({ online: false, responseTime: null });
+          done = true;
+          socket.close();
+          return;
+        }
         const ms = Date.now() - start;
-        socket.destroy();
-        resolve({ online: true, responseTime: ms });
-      })
-      .once("timeout", () => {
-        socket.destroy();
-        resolve({ online: false, responseTime: null });
-      })
-      .once("error", () => {
-        resolve({ online: false, responseTime: null });
-      })
-      .connect(port, host);
+        if (!done) resolve({ online: true, responseTime: ms });
+        done = true;
+        socket.close();
+      });
+
+      setTimeout(() => {
+        if (!done) {
+          resolve({ online: false, responseTime: null });
+          done = true;
+          socket.close();
+        }
+      }, timeout);
+    } else {
+      const socket = new net.Socket();
+      socket.setTimeout(timeout);
+      socket
+        .once("connect", () => {
+          const ms = Date.now() - start;
+          socket.destroy();
+          resolve({ online: true, responseTime: ms });
+        })
+        .once("timeout", () => {
+          socket.destroy();
+          resolve({ online: false, responseTime: null });
+        })
+        .once("error", () => {
+          resolve({ online: false, responseTime: null });
+        })
+        .connect(port, host);
+    }
   });
 }
 
-// ===== Получение аптайма из systemctl (если доступно) =====
+// ====== Аптайм из systemd (если сервис под systemctl) ======
 function getServiceUptime(name) {
   try {
     const out = execSync(
@@ -68,16 +102,15 @@ function getServiceUptime(name) {
   }
 }
 
-// ======= API =======
+// ====== API: системный статус ======
 app.get("/api/status", async (req, res) => {
   try {
-    const [cpuLoad, mem, temp, baseboard, disks, graphics] = await Promise.all([
+    const [cpuLoad, mem, temp, baseboard, disks] = await Promise.all([
       si.currentLoad(),
       si.mem(),
       si.cpuTemperature(),
       si.baseboard(),
       si.fsSize(),
-      si.graphics(),
     ]);
 
     const uptime = formatUptime(os.uptime());
@@ -85,15 +118,15 @@ app.get("/api/status", async (req, res) => {
     const usedDisk = disks.reduce((a, d) => a + d.used, 0);
 
     const services = [
-      { name: "GymBot", port: 30081, systemd: "gym-bot" },
-      { name: "Factorio", port: 34197, systemd: "factorio-server" },
-      { name: "Minecraft", port: 25565, systemd: "minecraft-server" },
-      { name: "PostgreSQL", port: 5432, systemd: "postgresql" },
+      { name: "GymBot", port: 30081, protocol: "tcp", systemd: "gym-bot" },
+      { name: "Factorio", port: 34197, protocol: "udp", systemd: "factorio-server" },
+      { name: "Minecraft", port: 25565, protocol: "tcp", systemd: "minecraft-server" },
+      { name: "PostgreSQL", port: 5432, protocol: "tcp", systemd: "postgresql" },
     ];
 
     const checks = await Promise.all(
       services.map(async (s) => {
-        const net = await checkPort(s.port);
+        const net = await checkPort(s.port, "192.168.0.120", 1000, s.protocol);
         const uptime = getServiceUptime(s.systemd);
         return { ...s, ...net, uptime };
       })
@@ -101,11 +134,10 @@ app.get("/api/status", async (req, res) => {
 
     res.json({
       system: {
-        motherboard: baseboard.model || baseboard.manufacturer,
         cpu: os.cpus()[0].model,
         cores: os.cpus().length,
-        gpu: graphics.controllers[0]?.model || "N/A",
         ramGB: (mem.total / 1e9).toFixed(1),
+        motherboard: baseboard.model || baseboard.manufacturer,
         uptime,
       },
       metrics: {
@@ -122,12 +154,12 @@ app.get("/api/status", async (req, res) => {
   }
 });
 
-// ======= SPA fallback =======
+// ====== SPA fallback ======
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
-// ======= Старт =======
+// ====== Запуск ======
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
