@@ -50,7 +50,7 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_KEY }}
-          port: 22
+          port: 2222
           script: |
             REPO="ghcr.io/${{ github.repository }}"
             TAG=${{ env.TAG }}
