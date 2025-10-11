@@ -81,8 +81,8 @@ app.get("/api/status", async (req, res) => {
   }
 });
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "dist", "index.html"));
+app.use((req, res) => {
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(PORT, "0.0.0.0", () => console.log(`✅ Server running on ${PORT}`));
