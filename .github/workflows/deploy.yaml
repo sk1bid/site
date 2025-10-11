@@ -15,7 +15,7 @@ jobs:
       packages: write
 
     steps:
-      # 🧩 1. Забираем код
+      # 🧩 1. Клонируем код
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -41,10 +41,9 @@ jobs:
           echo "📦 Pushing image to GHCR..."
           docker push $REPO:$TAG
 
-          # сохраняем тег для деплоя
           echo "TAG=$TAG" >> $GITHUB_ENV
 
-      # 🚀 4. Деплой на домашний K3s через SSH
+      # 🚀 4. Деплой на твой домашний сервер через SSH
       - name: Deploy to K3s over SSH
         uses: appleboy/ssh-action@master
         with:
@@ -55,24 +54,60 @@ jobs:
           script: |
             REPO="ghcr.io/${{ github.repository }}"
             TAG=${{ env.TAG }}
-
-            echo "🌀 Deploying image $REPO:$TAG to K3s..."
-
-            # namespace можно заменить, если хочешь свой
             NAMESPACE="default"
 
-            # если деплой уже есть — обновляем образ
-            if kubectl get deploy devops-site -n $NAMESPACE >/dev/null 2>&1; then
-              echo "🔁 Updating existing deployment..."
-              kubectl set image deploy/devops-site devops-site=$REPO:$TAG -n $NAMESPACE
-              kubectl rollout restart deploy/devops-site -n $NAMESPACE
-            else
-              echo "🚀 Creating new deployment..."
-              kubectl create deployment devops-site --image=$REPO:$TAG -n $NAMESPACE
-              kubectl expose deployment devops-site --port=80 --target-port=8080 --name=devops-site -n $NAMESPACE
-            fi
+            echo "🌀 Deploying $REPO:$TAG to K3s..."
 
-            # ждём завершения деплоя
-            kubectl rollout status deploy/devops-site -n $NAMESPACE
+            # --- Deployment ---
+            cat <<EOF | kubectl apply -f -
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: devops-site
+              namespace: ${NAMESPACE}
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app: devops-site
+              template:
+                metadata:
+                  labels:
+                    app: devops-site
+                spec:
+                  containers:
+                    - name: devops-site
+                      image: ${REPO}:${TAG}
+                      ports:
+                        - containerPort: 8080
+                      resources:
+                        requests:
+                          cpu: 100m
+                          memory: 128Mi
+                        limits:
+                          cpu: 500m
+                          memory: 512Mi
+            EOF
 
-            echo "🎉 Deployment complete!"
+            # --- Service (NodePort) ---
+            cat <<EOF | kubectl apply -f -
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: devops-site
+              namespace: ${NAMESPACE}
+            spec:
+              type: NodePort
+              selector:
+                app: devops-site
+              ports:
+                - name: http
+                  port: 80
+                  targetPort: 8080
+                  nodePort: 30000
+            EOF
+
+            kubectl rollout restart deploy/devops-site -n ${NAMESPACE}
+            kubectl rollout status deploy/devops-site -n ${NAMESPACE}
+
+            echo "✅ Deployment updated and restarted!"
