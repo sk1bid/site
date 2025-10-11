@@ -36,7 +36,7 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_KEY }}
-          port: 22
+          port: 2222
           script: |
             echo "Deploying latest image to k3s..."
             kubectl set image deploy/site site=ghcr.io/${{ github.repository_owner }}/site:latest -n default
