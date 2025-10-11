@@ -1,11 +1,20 @@
 export default function Navbar() {
   return (
-    <nav className="bg-gray-900 text-white p-4 flex justify-between">
-      <span className="font-bold text-xl">sk1bid.devops</span>
-      <div className="space-x-4">
-        <a href="/" className="hover:text-blue-400">Главная</a>
-        <a href="/projects" className="hover:text-blue-400">Проекты</a>
-        <a href="/about" className="hover:text-blue-400">Обо мне</a>
+    <nav className="glass-panel text-slate-100 px-6 py-4 mx-4 mt-4 flex justify-between items-center shadow-xl">
+      <span className="text-2xl font-black tracking-wide uppercase">sk1bid</span>
+      <div className="space-x-6 text-sm font-medium">
+        <a href="/" className="transition-colors hover:text-cyan-300">
+          Главная
+        </a>
+        <a href="/projects" className="transition-colors hover:text-cyan-300">
+          Проекты
+        </a>
+        <a href="/about" className="transition-colors hover:text-cyan-300">
+          Обо мне
+        </a>
+        <a href="/monitoring" className="transition-colors hover:text-cyan-300">
+          Мониторинг
+        </a>
       </div>
     </nav>
   );
