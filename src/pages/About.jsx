@@ -6,13 +6,13 @@ export default function About() {
         <p className="text-slate-300 text-base">
           Привет! Я Артём Иванов — DevOps-инженер и разработчик. Занимаюсь автоматизацией и инфраструктурой:
           Kubernetes, Docker, PostgreSQL, Telegram-боты и мониторинг. Все сервисы развернуты в моём домашнем
-          k3s-кластере на Ryzen 7.
+          k3s-кластере.
         </p>
         <div className="mt-8 grid sm:grid-cols-2 gap-4 text-sm text-slate-200">
           <p>
             🔗 Telegram:{" "}
-            <a href="https://t.me/sk1bid" className="text-cyan-300 hover:text-cyan-200 transition-colors">
-              @sk1bid
+            <a href="https://t.me/cg_skbid" className="text-cyan-300 hover:text-cyan-200 transition-colors">
+              @cg_skbid
             </a>
           </p>
           <p>
