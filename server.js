@@ -10,8 +10,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// ====== Статика для фронтенда ======
 app.use(express.static(path.join(__dirname, "dist")));
 
+// ====== Формат аптайма ======
 function formatUptime(seconds) {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -23,6 +25,7 @@ function formatUptime(seconds) {
   return parts.join(" ") || "менее минуты";
 }
 
+// ====== API endpoint ======
 app.get("/api/status", async (req, res) => {
   try {
     const cpu = await si.currentLoad();
@@ -39,8 +42,8 @@ app.get("/api/status", async (req, res) => {
 
     const checks = await Promise.all(
       services.map(async (s) => {
-        const net = await si.inetChecksite(`http://127.0.0.1:${s.port}`).catch(() => null);
-        return { ...s, online: !!net };
+        const online = await si.inetChecksite(`http://127.0.0.1:${s.port}`).then(() => true).catch(() => false);
+        return { ...s, online };
       })
     );
 
@@ -52,15 +55,18 @@ app.get("/api/status", async (req, res) => {
       services: checks,
     });
   } catch (err) {
-    console.error(err);
+    console.error("❌ Metrics error:", err);
     res.status(500).json({ error: "failed to fetch metrics" });
   }
 });
 
-
-app.get('/*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+// ====== SPA fallback ======
+// 🟢 ВАЖНО: именно /.*/ а не "/*" — это устраняет ошибку path-to-regexp
+app.get(/.*/, (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
-
-app.listen(PORT, "0.0.0.0", () => console.log(`✅ Server running on ${PORT}`));
+// ====== Запуск сервера ======
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
