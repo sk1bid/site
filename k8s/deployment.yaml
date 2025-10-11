@@ -1,24 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: devops-site
+  name: site
   namespace: default
+  labels:
+    app: site
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: devops-site
+      app: site
   template:
     metadata:
       labels:
-        app: devops-site
+        app: site
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+
       containers:
-        - name: devops-site
+        - name: site
           image: ghcr.io/sk1bid/site:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 8080
+            - containerPort: 5173
           resources:
             requests:
               cpu: 100m
@@ -26,3 +31,18 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          env:
+            - name: NODE_ENV
+              value: "production"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5173
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 5173
+            initialDelaySeconds: 30
+            periodSeconds: 20
