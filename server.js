@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// ===== Раздаём статику (React build) =====
+// ===== Раздаём React билд =====
 app.use(express.static(path.join(__dirname, "dist")));
 
 // ===== Форматирование аптайма =====
@@ -28,7 +28,7 @@ function formatUptime(seconds) {
 }
 
 // ===== Проверка TCP-порта =====
-function checkPort(port, host = "127.0.0.1", timeout = 1000) {
+function checkPort(port, host = "192.168.0.120", timeout = 1000) {
   return new Promise((resolve) => {
     const socket = new net.Socket();
     const start = Date.now();
@@ -51,7 +51,7 @@ function checkPort(port, host = "127.0.0.1", timeout = 1000) {
   });
 }
 
-// ===== Получение аптайма из systemctl (если есть) =====
+// ===== Получение аптайма из systemctl (если доступно) =====
 function getServiceUptime(name) {
   try {
     const out = execSync(
@@ -71,11 +71,10 @@ function getServiceUptime(name) {
 // ======= API =======
 app.get("/api/status", async (req, res) => {
   try {
-    const [cpuLoad, mem, temp, sys, baseboard, disks, graphics] = await Promise.all([
+    const [cpuLoad, mem, temp, baseboard, disks, graphics] = await Promise.all([
       si.currentLoad(),
       si.mem(),
       si.cpuTemperature(),
-      si.osInfo(),
       si.baseboard(),
       si.fsSize(),
       si.graphics(),
@@ -102,8 +101,6 @@ app.get("/api/status", async (req, res) => {
 
     res.json({
       system: {
-        os: `${sys.distro} ${sys.release}`,
-        kernel: sys.kernel,
         motherboard: baseboard.model || baseboard.manufacturer,
         cpu: os.cpus()[0].model,
         cores: os.cpus().length,
