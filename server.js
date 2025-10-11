@@ -6,14 +6,11 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// ====== Статика для фронтенда ======
 app.use(express.static(path.join(__dirname, "dist")));
 
-// ====== Формат аптайма ======
 function formatUptime(seconds) {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -25,14 +22,22 @@ function formatUptime(seconds) {
   return parts.join(" ") || "менее минуты";
 }
 
-// ====== API endpoint ======
 app.get("/api/status", async (req, res) => {
   try {
-    const cpu = await si.currentLoad();
-    const mem = await si.mem();
-    const temp = await si.cpuTemperature();
+    const [cpuLoad, mem, temp, sys, baseboard, disks, graphics] = await Promise.all([
+      si.currentLoad(),
+      si.mem(),
+      si.cpuTemperature(),
+      si.osInfo(),
+      si.baseboard(),
+      si.fsSize(),
+      si.graphics(),
+    ]);
 
     const uptime = formatUptime(os.uptime());
+    const totalDisk = disks.reduce((a, d) => a + d.size, 0);
+    const usedDisk = disks.reduce((a, d) => a + d.used, 0);
+
     const services = [
       { name: "GymBot", port: 30081 },
       { name: "Factorio", port: 34197 },
@@ -42,31 +47,42 @@ app.get("/api/status", async (req, res) => {
 
     const checks = await Promise.all(
       services.map(async (s) => {
-        const online = await si.inetChecksite(`http://127.0.0.1:${s.port}`).then(() => true).catch(() => false);
-        return { ...s, online };
+        const net = await si.inetChecksite(`http://127.0.0.1:${s.port}`).catch(() => null);
+        return {
+          ...s,
+          online: !!net,
+          responseTime: net?.ms || null,
+        };
       })
     );
 
     res.json({
-      cpu: cpu.currentLoad.toFixed(1),
-      mem: ((mem.active / mem.total) * 100).toFixed(1),
-      temp: temp.main ? temp.main.toFixed(1) : null,
-      uptime,
+      system: {
+        os: `${sys.distro} ${sys.release}`,
+        kernel: sys.kernel,
+        motherboard: baseboard.model || baseboard.manufacturer,
+        cpu: os.cpus()[0].model,
+        cores: os.cpus().length,
+        gpu: graphics.controllers[0]?.model || "N/A",
+        ramGB: (mem.total / 1e9).toFixed(1),
+        uptime,
+      },
+      metrics: {
+        cpu: cpuLoad.currentLoad.toFixed(1),
+        mem: ((mem.active / mem.total) * 100).toFixed(1),
+        temp: temp.main?.toFixed(1) || null,
+        disk: ((usedDisk / totalDisk) * 100).toFixed(1),
+      },
       services: checks,
     });
   } catch (err) {
-    console.error("❌ Metrics error:", err);
+    console.error("Ошибка API:", err);
     res.status(500).json({ error: "failed to fetch metrics" });
   }
 });
 
-// ====== SPA fallback ======
-// 🟢 ВАЖНО: именно /.*/ а не "/*" — это устраняет ошибку path-to-regexp
-app.get(/.*/, (req, res) => {
+app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
-// ====== Запуск сервера ======
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ Server running on port ${PORT}`);
-});
+app.listen(PORT, "0.0.0.0", () => console.log(`✅ Server running on ${PORT}`));
