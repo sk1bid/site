@@ -1,0 +1,78 @@
+name: Deploy DevOps Site to K3s
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # 🧩 1. Забираем код
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 🪣 2. Логинимся в GHCR
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      # 🛠️ 3. Собираем и пушим Docker-образ
+      - name: Build and push Docker image
+        env:
+          REPO: ghcr.io/${{ github.repository }}
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            TAG="prod-$SHORT_SHA"
+          else
+            TAG="dev-$SHORT_SHA"
+          fi
+
+          echo "🔨 Building image: $REPO:$TAG"
+          docker build -t $REPO:$TAG .
+
+          echo "📦 Pushing image to GHCR..."
+          docker push $REPO:$TAG
+
+          # сохраняем тег для деплоя
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      # 🚀 4. Деплой на домашний K3s через SSH
+      - name: Deploy to K3s over SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script: |
+            REPO="ghcr.io/${{ github.repository }}"
+            TAG=${{ env.TAG }}
+
+            echo "🌀 Deploying image $REPO:$TAG to K3s..."
+
+            # namespace можно заменить, если хочешь свой
+            NAMESPACE="default"
+
+            # если деплой уже есть — обновляем образ
+            if kubectl get deploy devops-site -n $NAMESPACE >/dev/null 2>&1; then
+              echo "🔁 Updating existing deployment..."
+              kubectl set image deploy/devops-site devops-site=$REPO:$TAG -n $NAMESPACE
+              kubectl rollout restart deploy/devops-site -n $NAMESPACE
+            else
+              echo "🚀 Creating new deployment..."
+              kubectl create deployment devops-site --image=$REPO:$TAG -n $NAMESPACE
+              kubectl expose deployment devops-site --port=80 --target-port=8080 --name=devops-site -n $NAMESPACE
+            fi
+
+            # ждём завершения деплоя
+            kubectl rollout status deploy/devops-site -n $NAMESPACE
+
+            echo "🎉 Deployment complete!"
