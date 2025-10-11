@@ -6,11 +6,14 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Отдаём статические файлы React
 app.use(express.static(path.join(__dirname, "dist")));
 
+// Форматирование аптайма
 function formatUptime(seconds) {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -22,6 +25,7 @@ function formatUptime(seconds) {
   return parts.join(" ") || "менее минуты";
 }
 
+// ===== API для фронта =====
 app.get("/api/status", async (req, res) => {
   try {
     const [cpuLoad, mem, temp, sys, baseboard, disks, graphics] = await Promise.all([
@@ -47,12 +51,12 @@ app.get("/api/status", async (req, res) => {
 
     const checks = await Promise.all(
       services.map(async (s) => {
-        const net = await si.inetChecksite(`http://127.0.0.1:${s.port}`).catch(() => null);
-        return {
-          ...s,
-          online: !!net,
-          responseTime: net?.ms || null,
-        };
+        try {
+          const net = await si.inetChecksite(`http://127.0.0.1:${s.port}`);
+          return { ...s, online: true, responseTime: net?.ms || null };
+        } catch {
+          return { ...s, online: false, responseTime: null };
+        }
       })
     );
 
@@ -70,7 +74,7 @@ app.get("/api/status", async (req, res) => {
       metrics: {
         cpu: cpuLoad.currentLoad.toFixed(1),
         mem: ((mem.active / mem.total) * 100).toFixed(1),
-        temp: temp.main?.toFixed(1) || null,
+        temp: temp.main?.toFixed(1) || "0.0",
         disk: ((usedDisk / totalDisk) * 100).toFixed(1),
       },
       services: checks,
@@ -81,8 +85,12 @@ app.get("/api/status", async (req, res) => {
   }
 });
 
+// ===== catch-all для React SPA =====
 app.use((req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
-app.listen(PORT, "0.0.0.0", () => console.log(`✅ Server running on ${PORT}`));
+// ===== запуск сервера =====
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
