@@ -6,7 +6,6 @@ export default function Navbar() {
         <a href="/" className="hover:text-blue-400">Главная</a>
         <a href="/projects" className="hover:text-blue-400">Проекты</a>
         <a href="/about" className="hover:text-blue-400">Обо мне</a>
-        <a href="/monitoring" className="hover:text-blue-400">Мониторинг</a>
       </div>
     </nav>
   );
