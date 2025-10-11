@@ -18,7 +18,7 @@ export default function Home() {
     return () => clearInterval(i);
   }, []);
 
-  if (!data) return <p className="text-gray-400 text-center mt-10">Загрузка...</p>;
+  if (!data) return <p className="text-gray-400 text-center mt-10">Download...</p>;
 
   const { system, metrics, services } = data;
 
@@ -26,15 +26,11 @@ export default function Home() {
     <div className="flex flex-col items-center text-center mt-10 px-4 space-y-8">
       {/* ===== Секция: железо ===== */}
       <section className="bg-gray-900 p-6 rounded-2xl shadow-lg max-w-4xl w-full">
-        <h2 className="text-cyan-400 text-2xl font-bold mb-3">Система</h2>
+        <h2 className="text-cyan-400 text-2xl font-bold mb-3">System</h2>
         <p className="text-gray-400 text-sm">
-          {system.cpu} • {system.cores} потоков • {system.ramGB} GB RAM
+          {system.cpu} • {system.cores} threads • {system.ramGB} GB RAM
         </p>
-        <p className="text-gray-500 text-sm mt-1">
-          {system.gpu} • {system.os} ({system.kernel})
-        </p>
-        <p className="text-gray-500 text-sm">Материнская плата: {system.motherboard}</p>
-        <p className="text-gray-500 text-sm mt-1">Аптайм: {system.uptime}</p>
+        <p className="text-gray-500 text-sm mt-1">Uptime: {system.uptime}</p>
       </section>
 
       {/* ===== Секция: ресурсы ===== */}
@@ -79,7 +75,7 @@ function Service({ name, online, responseTime }) {
     <div className="flex justify-between bg-gray-800 px-4 py-2 rounded-lg">
       <span className="font-semibold">{name}</span>
       <span className={online ? "text-cyan-400" : "text-red-400"}>
-        {online ? `✅ Онлайн (${responseTime} мс)` : "❌ Оффлайн"}
+        {online ? `🟢 Online (${responseTime} ms)` : "🔴 Offline"}
       </span>
     </div>
   );
