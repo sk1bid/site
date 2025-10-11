@@ -40,7 +40,6 @@ jobs:
           script: |
             echo "Deploying latest image to k3s..."
             kubectl set image deploy/site site=ghcr.io/${{ github.repository_owner }}/site:latest -n default
-            kubectl apply -f k8s/
             kubectl rollout restart deploy site -n default
             kubectl rollout status deploy site -n default
             echo "✅ Deployment successful!"
