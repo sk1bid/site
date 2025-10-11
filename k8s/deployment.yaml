@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: site
-  namespace: default
   labels:
     app: site
 spec:
@@ -17,32 +16,18 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr-secret
-
       containers:
         - name: site
           image: ghcr.io/sk1bid/site:latest
-          imagePullPolicy: Always
           ports:
-            - containerPort: 5173
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-          env:
-            - name: NODE_ENV
-              value: "production"
+            - containerPort: 8080
           readinessProbe:
             httpGet:
               path: /
-              port: 5173
+              port: 8080
             initialDelaySeconds: 10
-            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /
-              port: 5173
+              port: 8080
             initialDelaySeconds: 30
-            periodSeconds: 20
