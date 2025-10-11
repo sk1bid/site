@@ -2,6 +2,8 @@ import express from "express";
 import os from "os";
 import si from "systeminformation";
 import path from "path";
+import net from "net";
+import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -10,10 +12,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Отдаём статические файлы React
+// ===== Раздаём статику (React build) =====
 app.use(express.static(path.join(__dirname, "dist")));
 
-// Форматирование аптайма
+// ===== Форматирование аптайма =====
 function formatUptime(seconds) {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -25,7 +27,48 @@ function formatUptime(seconds) {
   return parts.join(" ") || "менее минуты";
 }
 
-// ===== API для фронта =====
+// ===== Проверка TCP-порта =====
+function checkPort(port, host = "127.0.0.1", timeout = 1000) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    const start = Date.now();
+
+    socket.setTimeout(timeout);
+    socket
+      .once("connect", () => {
+        const ms = Date.now() - start;
+        socket.destroy();
+        resolve({ online: true, responseTime: ms });
+      })
+      .once("timeout", () => {
+        socket.destroy();
+        resolve({ online: false, responseTime: null });
+      })
+      .once("error", () => {
+        resolve({ online: false, responseTime: null });
+      })
+      .connect(port, host);
+  });
+}
+
+// ===== Получение аптайма из systemctl (если есть) =====
+function getServiceUptime(name) {
+  try {
+    const out = execSync(
+      `systemctl show ${name} --property=ActiveEnterTimestampMonotonic --value`,
+      { encoding: "utf-8" }
+    ).trim();
+
+    if (!out) return null;
+    const activeMs = Number(out);
+    const uptimeSec = (Date.now() * 1000 - activeMs) / 1e6;
+    return formatUptime(uptimeSec);
+  } catch {
+    return null;
+  }
+}
+
+// ======= API =======
 app.get("/api/status", async (req, res) => {
   try {
     const [cpuLoad, mem, temp, sys, baseboard, disks, graphics] = await Promise.all([
@@ -43,20 +86,17 @@ app.get("/api/status", async (req, res) => {
     const usedDisk = disks.reduce((a, d) => a + d.used, 0);
 
     const services = [
-      { name: "GymBot", port: 30081 },
-      { name: "Factorio", port: 34197 },
-      { name: "Minecraft", port: 25565 },
-      { name: "PostgreSQL", port: 5432 },
+      { name: "GymBot", port: 30081, systemd: "gym-bot" },
+      { name: "Factorio", port: 34197, systemd: "factorio-server" },
+      { name: "Minecraft", port: 25565, systemd: "minecraft-server" },
+      { name: "PostgreSQL", port: 5432, systemd: "postgresql" },
     ];
 
     const checks = await Promise.all(
       services.map(async (s) => {
-        try {
-          const net = await si.inetChecksite(`http://127.0.0.1:${s.port}`);
-          return { ...s, online: true, responseTime: net?.ms || null };
-        } catch {
-          return { ...s, online: false, responseTime: null };
-        }
+        const net = await checkPort(s.port);
+        const uptime = getServiceUptime(s.systemd);
+        return { ...s, ...net, uptime };
       })
     );
 
@@ -85,12 +125,12 @@ app.get("/api/status", async (req, res) => {
   }
 });
 
-// ===== catch-all для React SPA =====
+// ======= SPA fallback =======
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
-// ===== запуск сервера =====
+// ======= Старт =======
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
