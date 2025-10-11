@@ -7,10 +7,13 @@ body {
   min-height: 100vh;
   background-color: #020617;
   background-image:
-    radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.18), transparent 55%),
-    radial-gradient(circle at 80% 0%, rgba(147, 51, 234, 0.16), transparent 55%),
-    radial-gradient(circle at 50% 100%, rgba(16, 185, 129, 0.12), transparent 60%);
+    radial-gradient(120% 120% at 20% 25%, rgba(56, 189, 248, 0.26) 0%, rgba(56, 189, 248, 0.18) 26%, rgba(129, 140, 248, 0.14) 52%, rgba(129, 140, 248, 0.08) 68%, transparent 82%),
+    radial-gradient(110% 110% at 78% 12%, rgba(147, 51, 234, 0.24) 0%, rgba(168, 85, 247, 0.18) 28%, rgba(244, 114, 182, 0.12) 54%, rgba(244, 114, 182, 0.06) 70%, transparent 84%),
+    radial-gradient(115% 115% at 35% 88%, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0.16) 25%, rgba(45, 212, 191, 0.12) 52%, rgba(45, 212, 191, 0.06) 70%, transparent 82%),
+    radial-gradient(130% 130% at 92% 80%, rgba(14, 165, 233, 0.18) 0%, rgba(37, 99, 235, 0.14) 30%, rgba(59, 130, 246, 0.1) 56%, rgba(59, 130, 246, 0.05) 72%, transparent 86%),
+    radial-gradient(125% 125% at 8% 70%, rgba(251, 191, 36, 0.16) 0%, rgba(251, 191, 36, 0.12) 28%, rgba(252, 211, 77, 0.08) 54%, rgba(252, 211, 77, 0.04) 72%, transparent 86%);
   background-attachment: fixed;
+  background-repeat: no-repeat;
   position: relative;
   overflow-x: hidden;
 }
@@ -20,10 +23,11 @@ body::before {
   position: fixed;
   inset: -40vmax;
   background:
-    radial-gradient(closest-side, rgba(236, 72, 153, 0.18), transparent),
-    radial-gradient(closest-side, rgba(59, 130, 246, 0.22), transparent);
-  filter: blur(120px);
-  opacity: 0.75;
+    radial-gradient(closest-side at 25% 30%, rgba(236, 72, 153, 0.34) 0%, rgba(236, 72, 153, 0.24) 32%, rgba(249, 115, 22, 0.16) 58%, rgba(249, 115, 22, 0.08) 76%, transparent 92%),
+    radial-gradient(closest-side at 70% 35%, rgba(59, 130, 246, 0.34) 0%, rgba(59, 130, 246, 0.24) 30%, rgba(129, 140, 248, 0.16) 56%, rgba(129, 140, 248, 0.08) 74%, transparent 92%),
+    radial-gradient(closest-side at 45% 72%, rgba(16, 185, 129, 0.3) 0%, rgba(16, 185, 129, 0.22) 34%, rgba(45, 212, 191, 0.16) 60%, rgba(45, 212, 191, 0.08) 78%, transparent 92%);
+  filter: blur(160px);
+  opacity: 0.8;
   animation: auroraShift 18s ease-in-out infinite;
   pointer-events: none;
   z-index: -1;
