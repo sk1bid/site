@@ -1,3 +1,6 @@
+/* eslint-env node */
+/* global process, Buffer */
+
 import express from "express";
 import os from "os";
 import si from "systeminformation";
@@ -12,6 +15,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+const HOST = process.env.STATUS_HOST || "192.168.0.120";
 
 // ====== Раздача фронтенда (React / Vue / Svelte и т.д.) ======
 app.use(express.static(path.join(__dirname, "dist")));
@@ -29,7 +33,7 @@ function formatUptime(seconds) {
 }
 
 // ====== Проверка TCP / UDP портов ======
-function checkPort(port, host = "192.168.0.120", timeout = 1000, protocol = "tcp") {
+function checkPort(port, host = HOST, timeout = 1000, protocol = "tcp") {
   return new Promise((resolve) => {
     const start = Date.now();
 
@@ -102,6 +106,223 @@ function getServiceUptime(name) {
   }
 }
 
+// ====== Minecraft ping (TCP status) ======
+function writeVarInt(value) {
+  let num = value;
+  if (num < 0) {
+    num = 0xffffffff + num + 1;
+  }
+
+  const bytes = [];
+  do {
+    let temp = num & 0x7f;
+    num >>>= 7;
+    if (num !== 0) {
+      temp |= 0x80;
+    }
+    bytes.push(temp);
+  } while (num !== 0);
+
+  return Buffer.from(bytes);
+}
+
+function readVarInt(buffer, offset = 0) {
+  let num = 0;
+  let shift = 0;
+  let bytesRead = 0;
+
+  while (true) {
+    if (offset + bytesRead >= buffer.length) {
+      return null;
+    }
+    const byte = buffer[offset + bytesRead];
+    num |= (byte & 0x7f) << shift;
+    bytesRead += 1;
+
+    if ((byte & 0x80) === 0) {
+      break;
+    }
+
+    shift += 7;
+    if (shift > 35) {
+      throw new Error("VarInt too big");
+    }
+  }
+
+  return { value: num, size: bytesRead };
+}
+
+function queryMinecraftStatus(host, port, timeout = 2000) {
+  return new Promise((resolve, reject) => {
+    const socket = net.createConnection({ host, port });
+    let resolved = false;
+    let buffer = Buffer.alloc(0);
+
+    const cleanup = (err, data) => {
+      if (resolved) return;
+      resolved = true;
+      socket.destroy();
+      if (err) {
+        reject(err);
+      } else {
+        resolve(data);
+      }
+    };
+
+    socket.setTimeout(timeout, () => cleanup(new Error("timeout")));
+    socket.once("error", (err) => cleanup(err));
+
+    socket.on("connect", () => {
+      try {
+        const hostBuf = Buffer.from(host, "utf8");
+        const handshakeData = Buffer.concat([
+          writeVarInt(0x00),
+          writeVarInt(-1),
+          writeVarInt(hostBuf.length),
+          hostBuf,
+          Buffer.from([(port >> 8) & 0xff, port & 0xff]),
+          writeVarInt(0x01),
+        ]);
+
+        const handshake = Buffer.concat([
+          writeVarInt(handshakeData.length),
+          handshakeData,
+        ]);
+
+        const request = Buffer.concat([
+          writeVarInt(0x01),
+          writeVarInt(0x00),
+        ]);
+
+        socket.write(handshake);
+        socket.write(request);
+      } catch (err) {
+        cleanup(err);
+      }
+    });
+
+    socket.on("data", (chunk) => {
+      buffer = Buffer.concat([buffer, chunk]);
+
+      try {
+        const lengthData = readVarInt(buffer, 0);
+        if (!lengthData) return;
+        const totalLength = lengthData.value;
+        if (buffer.length < totalLength + lengthData.size) return;
+
+        const idData = readVarInt(buffer, lengthData.size);
+        if (!idData) return;
+
+        const jsonLengthData = readVarInt(
+          buffer,
+          lengthData.size + idData.size
+        );
+        if (!jsonLengthData) return;
+
+        const jsonStart =
+          lengthData.size + idData.size + jsonLengthData.size;
+        const jsonEnd = jsonStart + jsonLengthData.value;
+        if (buffer.length < jsonEnd) return;
+
+        const jsonString = buffer.toString("utf8", jsonStart, jsonEnd);
+        const status = JSON.parse(jsonString);
+        cleanup(null, status);
+      } catch (err) {
+        cleanup(err);
+      }
+    });
+  });
+}
+
+// ====== Factorio (Source query protocol) ======
+function querySourceServer(host, port, timeout = 2000) {
+  return new Promise((resolve, reject) => {
+    const socket = dgram.createSocket("udp4");
+    let resolved = false;
+
+    const cleanup = (err, data) => {
+      if (resolved) return;
+      resolved = true;
+      socket.close();
+      if (err) {
+        reject(err);
+      } else {
+        resolve(data);
+      }
+    };
+
+    const baseHeader = Buffer.from([0xff, 0xff, 0xff, 0xff, 0x54]);
+    const baseQuery = Buffer.from("Source Engine Query\0", "ascii");
+
+    const sendQuery = (challenge) => {
+      const payload = challenge
+        ? Buffer.concat([baseHeader, baseQuery, challenge])
+        : Buffer.concat([baseHeader, baseQuery]);
+      socket.send(payload, port, host, (err) => {
+        if (err) cleanup(err);
+      });
+    };
+
+    socket.on("message", (msg) => {
+      if (resolved) return;
+      if (msg.length < 5) {
+        cleanup(new Error("Invalid response"));
+        return;
+      }
+
+      const type = msg[4];
+      if (type === 0x41) {
+        const challenge = msg.slice(5);
+        sendQuery(challenge);
+        return;
+      }
+
+      if (type !== 0x49) {
+        cleanup(new Error("Unexpected response"));
+        return;
+      }
+
+      let offset = 5;
+      offset += 1; // protocol byte
+
+      const readString = () => {
+        let end = offset;
+        while (end < msg.length && msg[end] !== 0) end += 1;
+        const str = msg.toString("utf8", offset, end);
+        offset = end + 1;
+        return str;
+      };
+
+      const name = readString();
+      readString(); // map
+      readString(); // folder
+      readString(); // game
+
+      if (offset + 2 > msg.length) {
+        cleanup(new Error("Invalid payload"));
+        return;
+      }
+      offset += 2; // appId
+
+      if (offset + 3 > msg.length) {
+        cleanup(new Error("Invalid payload"));
+        return;
+      }
+
+      const players = msg.readUInt8(offset);
+      const maxPlayers = msg.readUInt8(offset + 1);
+      const bots = msg.readUInt8(offset + 2);
+
+      cleanup(null, { name, players, maxPlayers, bots });
+    });
+
+    socket.once("error", (err) => cleanup(err));
+    socket.setTimeout(timeout, () => cleanup(new Error("timeout")));
+
+    sendQuery();
+  });
+}
+
 // ====== API: системный статус ======
 app.get("/api/status", async (req, res) => {
   try {
@@ -118,17 +339,66 @@ app.get("/api/status", async (req, res) => {
     const usedDisk = disks.reduce((a, d) => a + d.used, 0);
 
     const services = [
-      { name: "GymBot", port: 30081, protocol: "tcp", systemd: "gym-bot" },
-      { name: "Factorio", port: 34197, protocol: "udp", systemd: "factorio-server" },
-      { name: "Minecraft", port: 25565, protocol: "tcp", systemd: "minecraft-server" },
-      { name: "PostgreSQL", port: 5432, protocol: "tcp", systemd: "postgresql" },
+      { name: "GymBot", port: 30081, protocol: "tcp", systemd: "gym-bot", host: HOST },
+      {
+        name: "Factorio",
+        port: 34197,
+        protocol: "udp",
+        systemd: "factorio-server",
+        host: HOST,
+        queryType: "factorio",
+      },
+      {
+        name: "Minecraft",
+        port: 25565,
+        protocol: "tcp",
+        systemd: "minecraft-server",
+        host: HOST,
+        queryType: "minecraft",
+      },
+      { name: "PostgreSQL", port: 5432, protocol: "tcp", systemd: "postgresql", host: HOST },
     ];
 
     const checks = await Promise.all(
       services.map(async (s) => {
-        const net = await checkPort(s.port, "192.168.0.120", 1000, s.protocol);
+        let players = null;
+        let netInfo = { online: false, responseTime: null };
+
+        if (s.queryType === "minecraft") {
+          try {
+            const start = Date.now();
+            const status = await queryMinecraftStatus(s.host, s.port, 2000);
+            const responseTime = Date.now() - start;
+            netInfo = { online: true, responseTime };
+            players = {
+              current: status.players?.online ?? 0,
+              max: status.players?.max ?? 0,
+              list:
+                status.players?.sample?.map((p) => p.name).filter(Boolean) ?? [],
+            };
+          } catch {
+            netInfo = await checkPort(s.port, s.host, 1000, s.protocol);
+          }
+        } else if (s.queryType === "factorio") {
+          try {
+            const start = Date.now();
+            const info = await querySourceServer(s.host, s.port, 2000);
+            const responseTime = Date.now() - start;
+            netInfo = { online: true, responseTime };
+            players = {
+              current: info.players ?? 0,
+              max: info.maxPlayers ?? 0,
+              list: [],
+            };
+          } catch {
+            netInfo = await checkPort(s.port, s.host, 1000, s.protocol);
+          }
+        } else {
+          netInfo = await checkPort(s.port, s.host, 1000, s.protocol);
+        }
+
         const uptime = getServiceUptime(s.systemd);
-        return { ...s, ...net, uptime };
+        return { ...s, ...netInfo, uptime, players };
       })
     );
 

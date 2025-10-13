@@ -72,13 +72,34 @@ function Stat({ label, value, color, unit }) {
   );
 }
 
-function Service({ name, online, responseTime }) {
+function Service({ name, online, responseTime, players }) {
+  const latency =
+    online && typeof responseTime === "number"
+      ? ` (${Math.max(1, Math.round(responseTime))} ms)`
+      : "";
+  const statusText = online ? `🟢 Online${latency}` : "🔴 Offline";
+  const hasPlayers = players && typeof players.current === "number";
+  const playerCount = hasPlayers
+    ? `${players.current}/${players.max ?? "?"}`
+    : null;
+  const playerNames = players?.list?.filter(Boolean) ?? [];
+
   return (
-    <div className="glass-chip flex justify-between items-center px-4 py-3">
-      <span className="font-semibold tracking-wide text-slate-100">{name}</span>
-      <span className={online ? "text-emerald-300" : "text-rose-400"}>
-        {online ? `🟢 Online (${responseTime} ms)` : "🔴 Offline"}
-      </span>
+    <div className="glass-chip px-4 py-4 text-left">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-semibold tracking-wide text-slate-100">{name}</span>
+        <span className={online ? "text-emerald-300" : "text-rose-400"}>{statusText}</span>
+      </div>
+      <p className="mt-2 text-slate-300 text-sm font-medium">
+        {online
+          ? hasPlayers
+            ? `Игроки: ${playerCount}`
+            : "Игроки: данные недоступны"
+          : "Игроки: сервер недоступен"}
+      </p>
+      {online && playerNames.length > 0 && (
+        <p className="mt-1 text-slate-400 text-xs">Онлайн: {playerNames.join(", ")}</p>
+      )}
     </div>
   );
 }
