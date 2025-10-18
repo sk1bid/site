@@ -1,4 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+const initialState = { loading: true, error: null, payload: null };
+
+const initialState = { loading: true, error: null, payload: null };
+
+const initialState = { loading: true, error: null, payload: null };
 
 export default function Home() {
   const [state, setState] = useState(() => ({
