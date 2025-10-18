@@ -363,6 +363,7 @@ app.get("/api/status", async (req, res) => {
       services.map(async (s) => {
         let players = null;
         let netInfo = { online: false, responseTime: null };
+        const supportsPlayers = ["minecraft", "factorio"].includes(s.queryType);
 
         if (s.queryType === "minecraft") {
           try {
@@ -398,7 +399,7 @@ app.get("/api/status", async (req, res) => {
         }
 
         const uptime = getServiceUptime(s.systemd);
-        return { ...s, ...netInfo, uptime, players };
+        return { ...s, ...netInfo, uptime, players, supportsPlayers };
       })
     );
 
