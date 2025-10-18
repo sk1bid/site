@@ -4,6 +4,8 @@ const initialState = { loading: true, error: null, payload: null };
 
 const initialState = { loading: true, error: null, payload: null };
 
+const initialState = { loading: true, error: null, payload: null };
+
 export default function Home() {
   const [state, setState] = useState(initialState);
   const [reloadToken, setReloadToken] = useState(0);
@@ -229,7 +231,8 @@ export default function Home() {
 }
 
 function Stat({ label, value, color, unit, details = [] }) {
-  const width = `${Math.min(value, 100)}%`;
+  const numericValue = Number.isFinite(value) ? value : 0;
+  const width = `${Math.min(numericValue, 100)}%`;
   const lines = details.filter(
     (line, idx, arr) => typeof line === "string" && arr.indexOf(line) === idx
   );
@@ -281,7 +284,7 @@ function Stat({ label, value, color, unit, details = [] }) {
           ></div>
         </div>
         <p className="mt-3 text-slate-300 text-sm font-medium">
-          {value}
+          {Number.isFinite(value) ? value : "—"}
           {unit}
         </p>
       </div>

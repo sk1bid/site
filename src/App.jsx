@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -17,6 +17,8 @@ const navConfig = [
   { path: "/about", label: "About", icon: "👋" },
 ];
 
+const orderedRoutes = navConfig.map((item) => item.path);
+
 function SwipeLayout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -24,7 +26,6 @@ function SwipeLayout({ children }) {
   const startX = useRef(null);
   const startY = useRef(null);
   const startTime = useRef(0);
-  const orderedRoutes = useMemo(() => navConfig.map((item) => item.path), []);
 
   const resetSwipe = () => {
     pointerId.current = null;
