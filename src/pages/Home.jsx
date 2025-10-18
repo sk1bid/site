@@ -1,17 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 
-const initialState = { loading: true, error: null, payload: null };
-
-const initialState = { loading: true, error: null, payload: null };
-
-const initialState = { loading: true, error: null, payload: null };
+function createInitialState() {
+  return { loading: true, error: null, payload: null };
+}
 
 export default function Home() {
-  const [state, setState] = useState(() => ({
-    loading: true,
-    error: null,
-    payload: null,
-  }));
+  const [state, setState] = useState(createInitialState);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -61,7 +55,7 @@ export default function Home() {
           type="button"
           className="rounded-full border border-cyan-400/60 px-5 py-2 text-sm font-medium text-cyan-100 transition hover:border-cyan-300 hover:bg-cyan-400/10 hover:text-cyan-200"
           onClick={() => {
-            setState({ loading: true, error: null, payload: null });
+            setState(createInitialState());
             setReloadToken((token) => token + 1);
           }}
         >
