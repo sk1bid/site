@@ -26,22 +26,22 @@ const FACTORIO_RCON_SCRIPT = path.join(
   "factorio_online.py"
 );
 
-// ====== Раздача фронтенда (React / Vue / Svelte и т.д.) ======
+// ====== Serve the frontend bundle ======
 app.use(express.static(path.join(__dirname, "dist")));
 
-// ====== Формат аптайма ======
+// ====== Uptime formatting ======
 function formatUptime(seconds) {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const parts = [];
-  if (d) parts.push(`${d}д`);
-  if (h) parts.push(`${h}ч`);
-  if (m) parts.push(`${m}м`);
-  return parts.join(" ") || "менее минуты";
+  if (d) parts.push(`${d}d`);
+  if (h) parts.push(`${h}h`);
+  if (m) parts.push(`${m}m`);
+  return parts.join(" ") || "under a minute";
 }
 
-// ====== Проверка TCP / UDP портов ======
+// ====== TCP / UDP port check ======
 function checkPort(port, host = HOST, timeout = 1000, protocol = "tcp") {
   return new Promise((resolve) => {
     const start = Date.now();
@@ -98,7 +98,7 @@ function checkPort(port, host = HOST, timeout = 1000, protocol = "tcp") {
   });
 }
 
-// ====== Аптайм из systemd (если сервис под systemctl) ======
+// ====== systemd uptime helper (if the service is managed by systemctl) ======
 function getServiceUptime(name) {
   try {
     const out = execSync(
@@ -408,7 +408,7 @@ function queryFactorioPlayers(rconConfig, timeout = 2000) {
   });
 }
 
-// ====== API: системный статус ======
+// ====== API: system status ======
 app.get("/api/status", async (req, res) => {
   try {
     const [cpuLoad, mem, temp, baseboard, disks] = await Promise.all([
@@ -446,8 +446,25 @@ app.get("/api/status", async (req, res) => {
         host: HOST,
         queryType: "minecraft",
       },
-      { name: "PostgreSQL", port: 5432, protocol: "tcp", systemd: "postgresql", host: HOST },
     ];
+
+    const cpuInfo = os.cpus();
+    const primaryCpu = cpuInfo[0] || {};
+    const hardware = {
+      cpu: {
+        model: primaryCpu.model || "Unknown CPU",
+        cores: cpuInfo.length,
+      },
+      memory: {
+        totalGB: Number((mem.total / 1e9).toFixed(1)),
+      },
+      motherboard: baseboard.model || baseboard.manufacturer || "Unknown board",
+      disks: disks.map((disk) => ({
+        id: disk.fs || disk.mount || disk.name || "disk",
+        sizeGB: Number((disk.size / 1e9).toFixed(1)),
+        usedGB: Number((disk.used / 1e9).toFixed(1)),
+      })),
+    };
 
     const checks = await Promise.all(
       services.map(async (service) => {
@@ -528,10 +545,6 @@ app.get("/api/status", async (req, res) => {
 
     res.json({
       system: {
-        cpu: os.cpus()[0].model,
-        cores: os.cpus().length,
-        ramGB: (mem.total / 1e9).toFixed(1),
-        motherboard: baseboard.model || baseboard.manufacturer,
         uptime,
       },
       metrics: {
@@ -541,9 +554,10 @@ app.get("/api/status", async (req, res) => {
         disk: ((usedDisk / totalDisk) * 100).toFixed(1),
       },
       services: checks,
+      hardware,
     });
   } catch (err) {
-    console.error("Ошибка API:", err);
+    console.error("API error:", err);
     res.status(500).json({ error: "failed to fetch metrics" });
   }
 });
@@ -553,7 +567,7 @@ app.use((req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
-// ====== Запуск ======
+// ====== Boot ======
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
