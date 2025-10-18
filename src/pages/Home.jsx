@@ -6,6 +6,107 @@ export default function Home() {
   const [state, setState] = useState(initialState);
   const [reloadToken, setReloadToken] = useState(0);
 
+  const payload = state.payload ?? {};
+  const system = payload.system ?? null;
+  const metrics = payload.metrics ?? null;
+  const services = Array.isArray(payload.services) ? payload.services : [];
+  const hasServicesArray = Array.isArray(payload.services);
+  const hardware = payload.hardware ?? null;
+
+  const {
+    cpuDetails,
+    memoryDetails,
+    tempDetails,
+    diskDetails,
+    hardwareGroups,
+    desktopSummary,
+  } = useMemo(() => {
+    if (!hardware || typeof hardware !== "object") {
+      return {
+        cpuDetails: [],
+        memoryDetails: [],
+        tempDetails: [],
+        diskDetails: [],
+        hardwareGroups: [],
+        desktopSummary: [],
+      };
+    }
+
+    const safeMetrics = metrics && typeof metrics === "object" ? metrics : {};
+
+    const computedCpuDetails = [
+      hardware?.cpu?.model ? `Model: ${hardware.cpu.model}` : null,
+      Number.isFinite(hardware?.cpu?.cores) ? `Cores: ${hardware.cpu.cores}` : null,
+    ].filter(Boolean);
+
+    const totalMemory = hardware?.memory?.totalGB;
+    const computedMemoryDetails = [
+      Number.isFinite(totalMemory) ? `Total: ${totalMemory} GB` : null,
+    ].filter(Boolean);
+    const memUsagePercent = Number(safeMetrics?.mem);
+    if (Number.isFinite(totalMemory) && Number.isFinite(memUsagePercent)) {
+      const usedMemory = Number(((memUsagePercent / 100) * totalMemory).toFixed(1));
+      computedMemoryDetails.push(`Used: ${usedMemory} GB`);
+    }
+
+    const computedDiskDetails = (hardware?.disks || []).map((disk) =>
+      `Drive ${disk.id}: ${disk.usedGB}/${disk.sizeGB} GB`
+    );
+
+    const motherboardDetails = hardware?.motherboard
+      ? [`Board: ${hardware.motherboard}`]
+      : [];
+
+    const computedTempDetails = [];
+    if (Number.isFinite(safeMetrics?.temp)) {
+      computedTempDetails.push(`Now: ${safeMetrics.temp} °C`);
+    }
+    if (motherboardDetails.length > 0) {
+      computedTempDetails.push(...motherboardDetails);
+    } else if (computedCpuDetails.length > 0) {
+      computedTempDetails.push(...computedCpuDetails);
+    }
+
+    const groupedHardware = [
+      { title: "Processor", items: computedCpuDetails },
+      { title: "Memory", items: computedMemoryDetails },
+      { title: "Thermals", items: computedTempDetails },
+      { title: "Storage", items: computedDiskDetails },
+    ]
+      .map((group) => ({
+        ...group,
+        items: group.items.filter(
+          (line, idx, arr) => typeof line === "string" && arr.indexOf(line) === idx
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+
+    const summary = groupedHardware
+      .map((group) => {
+        const [headline] = group.items;
+        if (typeof headline !== "string") return null;
+        const [label, ...rest] = headline.split(":");
+        if (rest.length === 0) {
+          return { title: group.title, value: headline.trim() };
+        }
+        const value = rest.join(":").trim();
+        const sanitizedValue = value || headline.trim();
+        return { title: group.title, value: sanitizedValue };
+      })
+      .filter(Boolean);
+
+    return {
+      cpuDetails: computedCpuDetails,
+      memoryDetails: computedMemoryDetails,
+      tempDetails: computedTempDetails,
+      diskDetails: computedDiskDetails,
+      hardwareGroups: groupedHardware,
+      desktopSummary: summary,
+    };
+  }, [hardware, metrics]);
+
+  const hasHardwareGroups = hardwareGroups.length > 0;
+
   useEffect(() => {
     let active = true;
 
@@ -63,9 +164,7 @@ export default function Home() {
     );
   }
 
-  const { system, metrics, services, hardware } = state.payload || {};
-
-  if (!system || !metrics || !Array.isArray(services)) {
+  if (!system || !metrics || !hasServicesArray) {
     return (
       <div className="mt-12 flex flex-col items-center gap-4 text-center text-slate-200">
         <p className="text-lg font-semibold text-amber-200">Data temporarily unavailable</p>
@@ -75,72 +174,6 @@ export default function Home() {
       </div>
     );
   }
-
-  const cpuDetails = [
-    hardware?.cpu?.model ? `Model: ${hardware.cpu.model}` : null,
-    Number.isFinite(hardware?.cpu?.cores) ? `Cores: ${hardware.cpu.cores}` : null,
-  ].filter(Boolean);
-
-  const totalMemory = hardware?.memory?.totalGB;
-  const memoryDetails = [
-    Number.isFinite(totalMemory) ? `Total: ${totalMemory} GB` : null,
-  ].filter(Boolean);
-  const memUsagePercent = Number(metrics?.mem);
-  if (Number.isFinite(totalMemory) && Number.isFinite(memUsagePercent)) {
-    const usedMemory = Number(((memUsagePercent / 100) * totalMemory).toFixed(1));
-    memoryDetails.push(`Used: ${usedMemory} GB`);
-  }
-
-  const diskDetails = (hardware?.disks || []).map((disk) =>
-    `Drive ${disk.id}: ${disk.usedGB}/${disk.sizeGB} GB`
-  );
-  const motherboardDetails = hardware?.motherboard
-    ? [`Board: ${hardware.motherboard}`]
-    : [];
-  const tempDetails = [];
-  if (Number.isFinite(metrics?.temp)) {
-    tempDetails.push(`Now: ${metrics.temp} °C`);
-  }
-  if (motherboardDetails.length > 0) {
-    tempDetails.push(...motherboardDetails);
-  } else if (cpuDetails.length > 0) {
-    tempDetails.push(...cpuDetails);
-  }
-
-  const hardwareGroups = [
-    { title: "Processor", items: cpuDetails },
-    { title: "Memory", items: memoryDetails },
-    { title: "Thermals", items: tempDetails },
-    { title: "Storage", items: diskDetails },
-  ]
-    .map((group) => ({
-      ...group,
-      items: group.items.filter(
-        (line, idx, arr) => typeof line === "string" && arr.indexOf(line) === idx
-      ),
-    }))
-    .filter((group) => group.items.length > 0);
-  const hasHardwareGroups = hardwareGroups.length > 0;
-
-  const desktopSummary = useMemo(() => {
-    const sanitize = (line) => {
-      if (typeof line !== "string") return null;
-      const [label, ...rest] = line.split(":");
-      if (rest.length === 0) {
-        return line.trim();
-      }
-      const value = rest.join(":").trim();
-      return value || line.trim();
-    };
-
-    return hardwareGroups
-      .map((group) => {
-        const headline = sanitize(group.items[0]);
-        if (!headline) return null;
-        return { title: group.title, value: headline };
-      })
-      .filter(Boolean);
-  }, [hardwareGroups]);
 
   return (
     <div className="flex flex-col items-center mt-12 px-4 space-y-12 md:space-y-8 lg:space-y-10">
