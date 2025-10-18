@@ -43,7 +43,30 @@ export default function Home() {
   const motherboardDetails = hardware?.motherboard
     ? [`Плата: ${hardware.motherboard}`]
     : [];
-  const tempDetails = motherboardDetails.length > 0 ? motherboardDetails : cpuDetails;
+  const tempDetails = [];
+  if (Number.isFinite(metrics?.temp)) {
+    tempDetails.push(`Сейчас: ${metrics.temp} °C`);
+  }
+  if (motherboardDetails.length > 0) {
+    tempDetails.push(...motherboardDetails);
+  } else if (cpuDetails.length > 0) {
+    tempDetails.push(...cpuDetails);
+  }
+
+  const hardwareGroups = [
+    { title: "Процессор", items: cpuDetails },
+    { title: "Память", items: memoryDetails },
+    { title: "Температуры", items: tempDetails },
+    { title: "Накопители", items: diskDetails },
+  ]
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (line, idx, arr) => typeof line === "string" && arr.indexOf(line) === idx
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+  const hasHardwareGroups = hardwareGroups.length > 0;
 
   return (
     <div className="flex flex-col items-center text-center mt-12 px-4 space-y-10">
@@ -53,6 +76,25 @@ export default function Home() {
         <p className="text-slate-400 text-sm uppercase tracking-[0.2em]">
           Uptime: {system.uptime}
         </p>
+        {hasHardwareGroups && (
+          <div className="mt-6 space-y-4 md:hidden">
+            {hardwareGroups.map((group) => (
+              <article
+                key={group.title}
+                className="rounded-3xl border border-cyan-400/15 bg-slate-900/40 px-5 py-4 shadow-[0_18px_40px_rgba(8,15,35,0.45)] backdrop-blur"
+              >
+                <h3 className="text-slate-200 text-sm font-semibold tracking-[0.24em] uppercase">
+                  {group.title}
+                </h3>
+                <ul className="mt-2 space-y-1 text-slate-300 text-sm">
+                  {group.items.map((line, idx) => (
+                    <li key={idx}>{line}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ===== Секция: ресурсы ===== */}
@@ -102,20 +144,37 @@ export default function Home() {
 
 function Stat({ label, value, color, unit, details = [] }) {
   const width = `${Math.min(value, 100)}%`;
+  const lines = details.filter(
+    (line, idx, arr) => typeof line === "string" && arr.indexOf(line) === idx
+  );
+  const hasDetails = lines.length > 0;
+
   return (
-    <div className="glass-panel p-6 text-left relative group" style={{ overflow: "visible" }}>
-      <h3 className="text-cyan-200 font-semibold text-xl mb-3 tracking-wide">{label}</h3>
-      <div className="relative w-full bg-slate-900/60 ring-1 ring-white/10 rounded-full h-3 overflow-hidden">
-        <div
-          className={`${color} h-3 rounded-full transition-all duration-700 ease-out shadow-[0_0_18px_rgba(148,163,184,0.35)]`}
-          style={{ width }}
-        ></div>
+    <div className="group relative md:hover:z-40 md:focus-within:z-40">
+      <div
+        className={`glass-panel stat-card p-6 text-left transition-transform duration-300 ease-out ${
+          hasDetails
+            ? "md:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 md:hover:-translate-y-2 focus-visible:-translate-y-2"
+            : ""
+        }`}
+        tabIndex={hasDetails ? 0 : undefined}
+      >
+        <h3 className="text-cyan-200 font-semibold text-xl mb-3 tracking-wide">{label}</h3>
+        <div className="relative w-full bg-slate-900/60 ring-1 ring-white/10 rounded-full h-3 overflow-hidden">
+          <div
+            className={`${color} h-3 rounded-full transition-all duration-700 ease-out shadow-[0_0_18px_rgba(148,163,184,0.35)]`}
+            style={{ width }}
+          ></div>
+        </div>
+        <p className="mt-3 text-slate-300 text-sm font-medium">
+          {value}
+          {unit}
+        </p>
       </div>
-      <p className="mt-3 text-slate-300 text-sm font-medium">{value}{unit}</p>
-      {details.length > 0 && (
-        <div className="pointer-events-none absolute left-1/2 top-full z-20 hidden w-max -translate-x-1/2 rounded-xl bg-slate-900/95 px-4 py-3 text-xs text-slate-100 shadow-2xl ring-1 ring-cyan-500/30 group-hover:block">
+      {hasDetails && (
+        <div className="pointer-events-none absolute left-1/2 bottom-full hidden w-72 -translate-x-1/2 translate-y-4 rounded-3xl border border-cyan-400/20 bg-slate-950/95 px-6 py-5 text-xs text-slate-100 shadow-[0_35px_80px_rgba(8,15,35,0.75)] transition-all duration-300 md:flex md:flex-col md:opacity-0 md:group-hover:-translate-y-3 md:group-hover:opacity-100 md:group-focus-within:-translate-y-3 md:group-focus-within:opacity-100">
           <ul className="space-y-1 text-left">
-            {details.map((line, idx) => (
+            {lines.map((line, idx) => (
               <li key={idx}>{line}</li>
             ))}
           </ul>
