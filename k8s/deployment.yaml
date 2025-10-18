@@ -21,6 +21,22 @@ spec:
           image: ghcr.io/sk1bid/site:latest
           ports:
             - containerPort: 8080
+          env:
+            - name: FACTORIO_RCON_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: factorio-rcon
+                  key: FACTORIO_RCON_HOST
+            - name: FACTORIO_RCON_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: factorio-rcon
+                  key: FACTORIO_RCON_PORT
+            - name: FACTORIO_RCON_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: factorio-rcon
+                  key: FACTORIO_RCON_PASSWORD
           readinessProbe:
             httpGet:
               path: /
