@@ -492,28 +492,11 @@ app.get("/api/status", async (req, res) => {
             }
           }
 
-          let info = null;
-          let statusResponseTime = null;
-          const statusStart = Date.now();
-          try {
-            info = await querySourceServer(serviceInfo.host, serviceInfo.port, 2000);
-            statusResponseTime = Date.now() - statusStart;
-          } catch (err) {
-            console.warn("Factorio status query failed:", err.message);
-          }
-
           if (rconPlayers) {
             netInfo = { online: true, responseTime: rconPlayers.responseTime };
             players = {
               current: rconPlayers.players,
-              max: info?.maxPlayers ?? info?.players ?? null,
-              list: [],
-            };
-          } else if (info) {
-            netInfo = { online: true, responseTime: statusResponseTime };
-            players = {
-              current: info.players ?? 0,
-              max: info.maxPlayers ?? 0,
+              max: null,
               list: [],
             };
           } else {
