@@ -20,27 +20,71 @@ export default function Home() {
 
   if (!data) return <p className="text-gray-400 text-center mt-10">Download...</p>;
 
-  const { system, metrics, services } = data;
+  const { system, metrics, services, hardware } = data;
+
+  const cpuDetails = [
+    hardware?.cpu?.model ? `Модель: ${hardware.cpu.model}` : null,
+    Number.isFinite(hardware?.cpu?.cores) ? `Потоков: ${hardware.cpu.cores}` : null,
+  ].filter(Boolean);
+
+  const totalMemory = hardware?.memory?.totalGB;
+  const memoryDetails = [
+    Number.isFinite(totalMemory) ? `Всего: ${totalMemory} ГБ` : null,
+  ].filter(Boolean);
+  const memUsagePercent = Number(metrics?.mem);
+  if (Number.isFinite(totalMemory) && Number.isFinite(memUsagePercent)) {
+    const usedMemory = Number(((memUsagePercent / 100) * totalMemory).toFixed(1));
+    memoryDetails.push(`Использовано: ${usedMemory} ГБ`);
+  }
+
+  const diskDetails = (hardware?.disks || []).map((disk) =>
+    `Диск ${disk.id}: ${disk.usedGB}/${disk.sizeGB} ГБ`
+  );
+  const motherboardDetails = hardware?.motherboard
+    ? [`Плата: ${hardware.motherboard}`]
+    : [];
+  const tempDetails = motherboardDetails.length > 0 ? motherboardDetails : cpuDetails;
 
   return (
     <div className="flex flex-col items-center text-center mt-12 px-4 space-y-10">
       {/* ===== Секция: железо ===== */}
       <section className="glass-panel p-8 max-w-4xl w-full text-left">
         <h2 className="text-cyan-300 text-2xl font-bold mb-3 tracking-wide">System</h2>
-        <p className="text-slate-300 text-sm">
-          {system.cpu} • {system.cores} threads • {system.ramGB} GB RAM
-        </p>
-        <p className="text-slate-400 text-sm mt-3 uppercase tracking-[0.2em]">
+        <p className="text-slate-400 text-sm uppercase tracking-[0.2em]">
           Uptime: {system.uptime}
         </p>
       </section>
 
       {/* ===== Секция: ресурсы ===== */}
       <section className="grid md:grid-cols-4 gap-6 w-full max-w-5xl">
-        <Stat label="CPU" value={metrics.cpu} color="bg-cyan-500" unit="%" />
-        <Stat label="Memory" value={metrics.mem} color="bg-purple-500" unit="%" />
-        <Stat label="Temp" value={metrics.temp} color="bg-orange-500" unit="°C" />
-        <Stat label="Disk" value={metrics.disk} color="bg-green-500" unit="%" />
+        <Stat
+          label="CPU"
+          value={metrics.cpu}
+          color="bg-cyan-500"
+          unit="%"
+          details={cpuDetails}
+        />
+        <Stat
+          label="Memory"
+          value={metrics.mem}
+          color="bg-purple-500"
+          unit="%"
+          details={memoryDetails}
+        />
+        <Stat
+          label="Temp"
+          value={metrics.temp}
+          color="bg-orange-500"
+          unit="°C"
+          details={tempDetails}
+        />
+        <Stat
+          label="Disk"
+          value={metrics.disk}
+          color="bg-green-500"
+          unit="%"
+          details={diskDetails}
+        />
       </section>
 
       {/* ===== Секция: сервисы ===== */}
@@ -56,10 +100,10 @@ export default function Home() {
   );
 }
 
-function Stat({ label, value, color, unit }) {
+function Stat({ label, value, color, unit, details = [] }) {
   const width = `${Math.min(value, 100)}%`;
   return (
-    <div className="glass-panel p-6 text-left">
+    <div className="glass-panel p-6 text-left relative group" style={{ overflow: "visible" }}>
       <h3 className="text-cyan-200 font-semibold text-xl mb-3 tracking-wide">{label}</h3>
       <div className="relative w-full bg-slate-900/60 ring-1 ring-white/10 rounded-full h-3 overflow-hidden">
         <div
@@ -68,6 +112,15 @@ function Stat({ label, value, color, unit }) {
         ></div>
       </div>
       <p className="mt-3 text-slate-300 text-sm font-medium">{value}{unit}</p>
+      {details.length > 0 && (
+        <div className="pointer-events-none absolute left-1/2 top-full z-20 hidden w-max -translate-x-1/2 rounded-xl bg-slate-900/95 px-4 py-3 text-xs text-slate-100 shadow-2xl ring-1 ring-cyan-500/30 group-hover:block">
+          <ul className="space-y-1 text-left">
+            {details.map((line, idx) => (
+              <li key={idx}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

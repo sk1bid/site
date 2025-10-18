@@ -446,8 +446,25 @@ app.get("/api/status", async (req, res) => {
         host: HOST,
         queryType: "minecraft",
       },
-      { name: "PostgreSQL", port: 5432, protocol: "tcp", systemd: "postgresql", host: HOST },
     ];
+
+    const cpuInfo = os.cpus();
+    const primaryCpu = cpuInfo[0] || {};
+    const hardware = {
+      cpu: {
+        model: primaryCpu.model || "Unknown CPU",
+        cores: cpuInfo.length,
+      },
+      memory: {
+        totalGB: Number((mem.total / 1e9).toFixed(1)),
+      },
+      motherboard: baseboard.model || baseboard.manufacturer || "Unknown board",
+      disks: disks.map((disk) => ({
+        id: disk.fs || disk.mount || disk.name || "disk",
+        sizeGB: Number((disk.size / 1e9).toFixed(1)),
+        usedGB: Number((disk.used / 1e9).toFixed(1)),
+      })),
+    };
 
     const checks = await Promise.all(
       services.map(async (service) => {
@@ -528,10 +545,6 @@ app.get("/api/status", async (req, res) => {
 
     res.json({
       system: {
-        cpu: os.cpus()[0].model,
-        cores: os.cpus().length,
-        ramGB: (mem.total / 1e9).toFixed(1),
-        motherboard: baseboard.model || baseboard.manufacturer,
         uptime,
       },
       metrics: {
@@ -541,6 +554,7 @@ app.get("/api/status", async (req, res) => {
         disk: ((usedDisk / totalDisk) * 100).toFixed(1),
       },
       services: checks,
+      hardware,
     });
   } catch (err) {
     console.error("Ошибка API:", err);
