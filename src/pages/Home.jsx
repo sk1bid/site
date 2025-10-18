@@ -149,20 +149,48 @@ function Stat({ label, value, color, unit, details = [] }) {
   );
   const hasDetails = lines.length > 0;
 
+  const parsedDetails = lines.map((line) => {
+    const [rawTitle, ...rawRest] = line.split(":");
+    if (rawRest.length === 0) {
+      return { id: line, title: null, value: line.trim() };
+    }
+    const title = rawTitle.trim();
+    const value = rawRest.join(":").trim();
+    return {
+      id: `${title}-${value}`,
+      title,
+      value,
+    };
+  });
+
+  const popoverCopy = {
+    CPU: "Параметры процессора",
+    Memory: "Использование памяти",
+    Temp: "Температура и плата",
+    Disk: "Состояние накопителей",
+  };
+
+  const popoverIcon = {
+    CPU: "🧠",
+    Memory: "💾",
+    Temp: "🌡️",
+    Disk: "💽",
+  };
+
   return (
     <div className="group relative md:hover:z-40 md:focus-within:z-40">
       <div
-        className={`glass-panel stat-card p-6 text-left transition-transform duration-300 ease-out ${
+        className={`glass-panel stat-card p-6 text-left transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           hasDetails
-            ? "md:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 md:hover:-translate-y-2 focus-visible:-translate-y-2"
+            ? "md:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 md:hover:-translate-y-3 focus-visible:-translate-y-3"
             : ""
         }`}
         tabIndex={hasDetails ? 0 : undefined}
       >
         <h3 className="text-cyan-200 font-semibold text-xl mb-3 tracking-wide">{label}</h3>
-        <div className="relative w-full bg-slate-900/60 ring-1 ring-white/10 rounded-full h-3 overflow-hidden">
+        <div className="relative w-full overflow-hidden rounded-full bg-slate-900/60 ring-1 ring-white/10 h-3">
           <div
-            className={`${color} h-3 rounded-full transition-all duration-700 ease-out shadow-[0_0_18px_rgba(148,163,184,0.35)]`}
+            className={`${color} stat-bar h-3 rounded-full shadow-[0_0_18px_rgba(148,163,184,0.35)]`}
             style={{ width }}
           ></div>
         </div>
@@ -172,12 +200,26 @@ function Stat({ label, value, color, unit, details = [] }) {
         </p>
       </div>
       {hasDetails && (
-        <div className="pointer-events-none absolute left-1/2 bottom-full hidden w-72 -translate-x-1/2 translate-y-4 rounded-3xl border border-cyan-400/20 bg-slate-950/95 px-6 py-5 text-xs text-slate-100 shadow-[0_35px_80px_rgba(8,15,35,0.75)] transition-all duration-300 md:flex md:flex-col md:opacity-0 md:group-hover:-translate-y-3 md:group-hover:opacity-100 md:group-focus-within:-translate-y-3 md:group-focus-within:opacity-100">
-          <ul className="space-y-1 text-left">
-            {lines.map((line, idx) => (
-              <li key={idx}>{line}</li>
+        <div className="stat-popover pointer-events-none absolute left-1/2 bottom-full hidden w-80 -translate-x-1/2 translate-y-5 md:flex md:flex-col md:opacity-0 md:group-hover:-translate-y-4 md:group-hover:opacity-100 md:group-hover:pointer-events-auto md:group-focus-within:-translate-y-4 md:group-focus-within:opacity-100 md:group-focus-within:pointer-events-auto">
+          <header className="flex items-center gap-3 text-left">
+            <div className="stat-popover__icon" aria-hidden>{popoverIcon[label] ?? "ℹ️"}</div>
+            <div>
+              <p className="text-[0.7rem] uppercase tracking-[0.26em] text-cyan-200/80">{label}</p>
+              <p className="text-sm font-semibold text-slate-50">
+                {popoverCopy[label] ?? "Дополнительные сведения"}
+              </p>
+            </div>
+          </header>
+          <dl className="mt-4 space-y-2 text-left text-sm text-slate-100">
+            {parsedDetails.map((item) => (
+              <div key={item.id} className="stat-detail">
+                {item.title ? (
+                  <dt className="stat-detail__label">{item.title}</dt>
+                ) : null}
+                <dd className="stat-detail__value">{item.value}</dd>
+              </div>
             ))}
-          </ul>
+          </dl>
         </div>
       )}
     </div>
