@@ -81,7 +81,7 @@ function Service({ name, online, responseTime, players, supportsPlayers }) {
   const hasPlayers =
     supportsPlayers && players && typeof players.current === "number";
   const playerCount = hasPlayers
-    ? `${players.current}/${players.max ?? "?"}`
+    ? `${players.current}/${players.max ?? 10}`
     : null;
   const playerNames = hasPlayers ? players.list?.filter(Boolean) ?? [] : [];
 
