@@ -229,8 +229,9 @@ export default function Home() {
 }
 
 function Stat({ label, value, color, unit, details = [] }) {
-  const numericValue = Number.isFinite(value) ? value : 0;
-  const width = `${Math.min(numericValue, 100)}%`;
+  const parsedValue = Number.parseFloat(value);
+  const numericValue = Number.isFinite(parsedValue) ? parsedValue : null;
+  const width = numericValue !== null ? `${Math.min(Math.max(numericValue, 0), 100)}%` : "0%";
   const lines = details.filter(
     (line, idx, arr) => typeof line === "string" && arr.indexOf(line) === idx
   );
@@ -282,7 +283,11 @@ function Stat({ label, value, color, unit, details = [] }) {
           ></div>
         </div>
         <p className="mt-3 text-slate-300 text-sm font-medium">
-          {Number.isFinite(value) ? value : "—"}
+          {numericValue !== null
+            ? Number.isInteger(numericValue)
+              ? numericValue
+              : numericValue.toFixed(1)
+            : "—"}
           {unit}
         </p>
       </div>
