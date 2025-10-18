@@ -7,7 +7,8 @@ import si from "systeminformation";
 import path from "path";
 import net from "net";
 import dgram from "dgram";
-import { execSync } from "child_process";
+import fs from "fs";
+import { execSync, spawn } from "child_process";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,6 +17,14 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.STATUS_HOST || "192.168.0.120";
+const FACTORIO_RCON_HOST = process.env.FACTORIO_RCON_HOST || HOST;
+const FACTORIO_RCON_PORT = Number(process.env.FACTORIO_RCON_PORT || 27015);
+const FACTORIO_RCON_PASSWORD = process.env.FACTORIO_RCON_PASSWORD || "";
+const FACTORIO_RCON_SCRIPT = path.join(
+  __dirname,
+  "scripts",
+  "factorio_online.py"
+);
 
 // ====== Раздача фронтенда (React / Vue / Svelte и т.д.) ======
 app.use(express.static(path.join(__dirname, "dist")));
@@ -323,6 +332,82 @@ function querySourceServer(host, port, timeout = 2000) {
   });
 }
 
+function queryFactorioPlayers(rconConfig, timeout = 2000) {
+  if (!rconConfig || !rconConfig.password) {
+    return Promise.reject(new Error("Factorio RCON is not configured"));
+  }
+
+  if (!fs.existsSync(FACTORIO_RCON_SCRIPT)) {
+    return Promise.reject(new Error("Factorio RCON helper script is missing"));
+  }
+
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const args = [
+      FACTORIO_RCON_SCRIPT,
+      rconConfig.host,
+      String(rconConfig.port),
+    ];
+
+    const child = spawn("python3", args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        FACTORIO_RCON_PASSWORD: rconConfig.password,
+      },
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let finished = false;
+
+    const timer = setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      child.kill("SIGKILL");
+      reject(new Error("Factorio RCON timeout"));
+    }, timeout);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.once("error", (err) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    child.once("close", (code) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+
+      if (code !== 0) {
+        reject(new Error(stderr.trim() || "Factorio RCON exited with error"));
+        return;
+      }
+
+      const trimmed = stdout.trim();
+      const count = Number.parseInt(trimmed, 10);
+      if (!Number.isFinite(count) || count < 0) {
+        reject(new Error(`Unexpected Factorio RCON output: ${trimmed}`));
+        return;
+      }
+
+      resolve({
+        players: count,
+        responseTime: Date.now() - start,
+      });
+    });
+  });
+}
+
 // ====== API: системный статус ======
 app.get("/api/status", async (req, res) => {
   try {
@@ -347,6 +432,11 @@ app.get("/api/status", async (req, res) => {
         systemd: "factorio-server",
         host: HOST,
         queryType: "factorio",
+        rcon: {
+          host: FACTORIO_RCON_HOST,
+          port: FACTORIO_RCON_PORT,
+          password: FACTORIO_RCON_PASSWORD,
+        },
       },
       {
         name: "Minecraft",
@@ -360,14 +450,22 @@ app.get("/api/status", async (req, res) => {
     ];
 
     const checks = await Promise.all(
-      services.map(async (s) => {
+      services.map(async (service) => {
+        const { rcon, ...serviceInfo } = service;
         let players = null;
         let netInfo = { online: false, responseTime: null };
+        const supportsPlayers = ["minecraft", "factorio"].includes(
+          serviceInfo.queryType
+        );
 
-        if (s.queryType === "minecraft") {
+        if (serviceInfo.queryType === "minecraft") {
           try {
             const start = Date.now();
-            const status = await queryMinecraftStatus(s.host, s.port, 2000);
+            const status = await queryMinecraftStatus(
+              serviceInfo.host,
+              serviceInfo.port,
+              2000
+            );
             const responseTime = Date.now() - start;
             netInfo = { online: true, responseTime };
             players = {
@@ -377,28 +475,57 @@ app.get("/api/status", async (req, res) => {
                 status.players?.sample?.map((p) => p.name).filter(Boolean) ?? [],
             };
           } catch {
-            netInfo = await checkPort(s.port, s.host, 1000, s.protocol);
+            netInfo = await checkPort(
+              serviceInfo.port,
+              serviceInfo.host,
+              1000,
+              serviceInfo.protocol
+            );
           }
-        } else if (s.queryType === "factorio") {
+        } else if (serviceInfo.queryType === "factorio") {
           try {
-            const start = Date.now();
-            const info = await querySourceServer(s.host, s.port, 2000);
-            const responseTime = Date.now() - start;
+            const statusStart = Date.now();
+            const info = await querySourceServer(
+              serviceInfo.host,
+              serviceInfo.port,
+              2000
+            );
+            let rconPlayers = null;
+            if (rcon?.password) {
+              try {
+                rconPlayers = await queryFactorioPlayers(rcon, 2000);
+              } catch (err) {
+                console.warn("Factorio RCON query failed:", err.message);
+              }
+            }
+
+            const responseTime = rconPlayers?.responseTime ?? Date.now() - statusStart;
             netInfo = { online: true, responseTime };
             players = {
-              current: info.players ?? 0,
+              current: rconPlayers?.players ?? info.players ?? 0,
               max: info.maxPlayers ?? 0,
               list: [],
             };
-          } catch {
-            netInfo = await checkPort(s.port, s.host, 1000, s.protocol);
+          } catch (err) {
+            console.warn("Factorio status query failed:", err.message);
+            netInfo = await checkPort(
+              serviceInfo.port,
+              serviceInfo.host,
+              1000,
+              serviceInfo.protocol
+            );
           }
         } else {
-          netInfo = await checkPort(s.port, s.host, 1000, s.protocol);
+          netInfo = await checkPort(
+            serviceInfo.port,
+            serviceInfo.host,
+            1000,
+            serviceInfo.protocol
+          );
         }
 
-        const uptime = getServiceUptime(s.systemd);
-        return { ...s, ...netInfo, uptime, players };
+        const uptime = getServiceUptime(serviceInfo.systemd);
+        return { ...serviceInfo, ...netInfo, uptime, players, supportsPlayers };
       })
     );
 
