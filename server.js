@@ -493,7 +493,12 @@ app.get("/api/status", async (req, res) => {
           }
 
           if (rconPlayers) {
-            netInfo = { online: true, responseTime: rconPlayers.responseTime };
+            netInfo = await checkPort(
+              serviceInfo.port,
+              serviceInfo.host,
+              1000,
+              serviceInfo.protocol
+            );
             players = {
               current: rconPlayers.players,
               max: null,
