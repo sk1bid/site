@@ -347,11 +347,14 @@ function queryFactorioPlayers(rconConfig, timeout = 2000) {
       FACTORIO_RCON_SCRIPT,
       rconConfig.host,
       String(rconConfig.port),
-      rconConfig.password,
     ];
 
     const child = spawn("python3", args, {
       stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        FACTORIO_RCON_PASSWORD: rconConfig.password,
+      },
     });
 
     let stdout = "";
@@ -447,15 +450,22 @@ app.get("/api/status", async (req, res) => {
     ];
 
     const checks = await Promise.all(
-      services.map(async (s) => {
+      services.map(async (service) => {
+        const { rcon, ...serviceInfo } = service;
         let players = null;
         let netInfo = { online: false, responseTime: null };
-        const supportsPlayers = ["minecraft", "factorio"].includes(s.queryType);
+        const supportsPlayers = ["minecraft", "factorio"].includes(
+          serviceInfo.queryType
+        );
 
-        if (s.queryType === "minecraft") {
+        if (serviceInfo.queryType === "minecraft") {
           try {
             const start = Date.now();
-            const status = await queryMinecraftStatus(s.host, s.port, 2000);
+            const status = await queryMinecraftStatus(
+              serviceInfo.host,
+              serviceInfo.port,
+              2000
+            );
             const responseTime = Date.now() - start;
             netInfo = { online: true, responseTime };
             players = {
@@ -465,21 +475,31 @@ app.get("/api/status", async (req, res) => {
                 status.players?.sample?.map((p) => p.name).filter(Boolean) ?? [],
             };
           } catch {
-            netInfo = await checkPort(s.port, s.host, 1000, s.protocol);
+            netInfo = await checkPort(
+              serviceInfo.port,
+              serviceInfo.host,
+              1000,
+              serviceInfo.protocol
+            );
           }
-        } else if (s.queryType === "factorio") {
+        } else if (serviceInfo.queryType === "factorio") {
           try {
-            const info = await querySourceServer(s.host, s.port, 2000);
+            const statusStart = Date.now();
+            const info = await querySourceServer(
+              serviceInfo.host,
+              serviceInfo.port,
+              2000
+            );
             let rconPlayers = null;
-            if (s.rcon?.password) {
+            if (rcon?.password) {
               try {
-                rconPlayers = await queryFactorioPlayers(s.rcon, 2000);
+                rconPlayers = await queryFactorioPlayers(rcon, 2000);
               } catch (err) {
                 console.warn("Factorio RCON query failed:", err.message);
               }
             }
 
-            const responseTime = rconPlayers?.responseTime ?? null;
+            const responseTime = rconPlayers?.responseTime ?? Date.now() - statusStart;
             netInfo = { online: true, responseTime };
             players = {
               current: rconPlayers?.players ?? info.players ?? 0,
@@ -488,14 +508,24 @@ app.get("/api/status", async (req, res) => {
             };
           } catch (err) {
             console.warn("Factorio status query failed:", err.message);
-            netInfo = await checkPort(s.port, s.host, 1000, s.protocol);
+            netInfo = await checkPort(
+              serviceInfo.port,
+              serviceInfo.host,
+              1000,
+              serviceInfo.protocol
+            );
           }
         } else {
-          netInfo = await checkPort(s.port, s.host, 1000, s.protocol);
+          netInfo = await checkPort(
+            serviceInfo.port,
+            serviceInfo.host,
+            1000,
+            serviceInfo.protocol
+          );
         }
 
-        const uptime = getServiceUptime(s.systemd);
-        return { ...s, ...netInfo, uptime, players, supportsPlayers };
+        const uptime = getServiceUptime(serviceInfo.systemd);
+        return { ...serviceInfo, ...netInfo, uptime, players, supportsPlayers };
       })
     );
 
