@@ -1,26 +1,80 @@
 import { useEffect, useMemo, useState } from "react";
 
+const initialState = { loading: true, error: null, payload: null };
+
 export default function Home() {
-  const [data, setData] = useState(null);
+  const [state, setState] = useState(initialState);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
+    let active = true;
+
     const fetchData = async () => {
       try {
         const res = await fetch("/api/status");
         const json = await res.json();
-        setData(json);
+
+        if (!res.ok) {
+          throw new Error(json?.error || `Request failed with ${res.status}`);
+        }
+
+        if (!active) return;
+
+        setState({ loading: false, error: null, payload: json });
       } catch (err) {
         console.error("Failed to fetch status:", err);
+        if (!active) return;
+        setState({
+          loading: false,
+          error: "Status data is temporarily unavailable. Please try again shortly.",
+          payload: null,
+        });
       }
     };
+
     fetchData();
     const i = setInterval(fetchData, 5000);
-    return () => clearInterval(i);
-  }, []);
+    return () => {
+      active = false;
+      clearInterval(i);
+    };
+  }, [reloadToken]);
 
-  if (!data) return <p className="text-gray-400 text-center mt-10">Loading...</p>;
+  if (state.loading) {
+    return <p className="text-gray-400 text-center mt-10">Loading...</p>;
+  }
 
-  const { system, metrics, services, hardware } = data;
+  if (state.error) {
+    return (
+      <div className="mt-12 flex flex-col items-center gap-4 text-center text-slate-200">
+        <p className="text-lg font-semibold text-rose-300">Something went wrong</p>
+        <p className="max-w-sm text-sm text-slate-300/80">{state.error}</p>
+        <button
+          type="button"
+          className="rounded-full border border-cyan-400/60 px-5 py-2 text-sm font-medium text-cyan-100 transition hover:border-cyan-300 hover:bg-cyan-400/10 hover:text-cyan-200"
+          onClick={() => {
+            setState({ ...initialState });
+            setReloadToken((token) => token + 1);
+          }}
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  const { system, metrics, services, hardware } = state.payload || {};
+
+  if (!system || !metrics || !Array.isArray(services)) {
+    return (
+      <div className="mt-12 flex flex-col items-center gap-4 text-center text-slate-200">
+        <p className="text-lg font-semibold text-amber-200">Data temporarily unavailable</p>
+        <p className="max-w-sm text-sm text-slate-300/80">
+          The API response was missing expected fields. Please refresh the page or check back later.
+        </p>
+      </div>
+    );
+  }
 
   const cpuDetails = [
     hardware?.cpu?.model ? `Model: ${hardware.cpu.model}` : null,
