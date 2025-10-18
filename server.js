@@ -483,31 +483,40 @@ app.get("/api/status", async (req, res) => {
             );
           }
         } else if (serviceInfo.queryType === "factorio") {
-          try {
-            const statusStart = Date.now();
-            const info = await querySourceServer(
-              serviceInfo.host,
-              serviceInfo.port,
-              2000
-            );
-            let rconPlayers = null;
-            if (rcon?.password) {
-              try {
-                rconPlayers = await queryFactorioPlayers(rcon, 2000);
-              } catch (err) {
-                console.warn("Factorio RCON query failed:", err.message);
-              }
+          let rconPlayers = null;
+          if (rcon?.password) {
+            try {
+              rconPlayers = await queryFactorioPlayers(rcon, 2000);
+            } catch (err) {
+              console.warn("Factorio RCON query failed:", err.message);
             }
+          }
 
-            const responseTime = rconPlayers?.responseTime ?? Date.now() - statusStart;
-            netInfo = { online: true, responseTime };
+          let info = null;
+          let statusResponseTime = null;
+          const statusStart = Date.now();
+          try {
+            info = await querySourceServer(serviceInfo.host, serviceInfo.port, 2000);
+            statusResponseTime = Date.now() - statusStart;
+          } catch (err) {
+            console.warn("Factorio status query failed:", err.message);
+          }
+
+          if (rconPlayers) {
+            netInfo = { online: true, responseTime: rconPlayers.responseTime };
             players = {
-              current: rconPlayers?.players ?? info.players ?? 0,
+              current: rconPlayers.players,
+              max: info?.maxPlayers ?? info?.players ?? null,
+              list: [],
+            };
+          } else if (info) {
+            netInfo = { online: true, responseTime: statusResponseTime };
+            players = {
+              current: info.players ?? 0,
               max: info.maxPlayers ?? 0,
               list: [],
             };
-          } catch (err) {
-            console.warn("Factorio status query failed:", err.message);
+          } else {
             netInfo = await checkPort(
               serviceInfo.port,
               serviceInfo.host,
