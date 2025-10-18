@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 
 const initialState = { loading: true, error: null, payload: null };
 
+const initialState = { loading: true, error: null, payload: null };
+
 export default function Home() {
   const [state, setState] = useState(initialState);
   const [reloadToken, setReloadToken] = useState(0);
@@ -65,17 +67,6 @@ export default function Home() {
 
   const { system, metrics, services, hardware } = state.payload || {};
 
-  if (!system || !metrics || !Array.isArray(services)) {
-    return (
-      <div className="mt-12 flex flex-col items-center gap-4 text-center text-slate-200">
-        <p className="text-lg font-semibold text-amber-200">Data temporarily unavailable</p>
-        <p className="max-w-sm text-sm text-slate-300/80">
-          The API response was missing expected fields. Please refresh the page or check back later.
-        </p>
-      </div>
-    );
-  }
-
   const cpuDetails = [
     hardware?.cpu?.model ? `Model: ${hardware.cpu.model}` : null,
     Number.isFinite(hardware?.cpu?.cores) ? `Cores: ${hardware.cpu.cores}` : null,
@@ -122,25 +113,30 @@ export default function Home() {
     .filter((group) => group.items.length > 0);
   const hasHardwareGroups = hardwareGroups.length > 0;
 
-  const desktopSummary = useMemo(() => {
-    const sanitize = (line) => {
-      if (typeof line !== "string") return null;
-      const [label, ...rest] = line.split(":");
+  const desktopSummary = hardwareGroups
+    .map((group) => {
+      const [label, ...rest] = (group.items[0] ?? "").split(":");
+      if (!group.items[0]) {
+        return null;
+      }
       if (rest.length === 0) {
-        return line.trim();
+        return { title: group.title, value: group.items[0].trim() };
       }
       const value = rest.join(":").trim();
-      return value || line.trim();
-    };
+      return { title: group.title, value: value || group.items[0].trim() };
+    })
+    .filter(Boolean);
 
-    return hardwareGroups
-      .map((group) => {
-        const headline = sanitize(group.items[0]);
-        if (!headline) return null;
-        return { title: group.title, value: headline };
-      })
-      .filter(Boolean);
-  }, [hardwareGroups]);
+  if (!system || !metrics || !Array.isArray(services)) {
+    return (
+      <div className="mt-12 flex flex-col items-center gap-4 text-center text-slate-200">
+        <p className="text-lg font-semibold text-amber-200">Data temporarily unavailable</p>
+        <p className="max-w-sm text-sm text-slate-300/80">
+          The API response was missing expected fields. Please refresh the page or check back later.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center mt-12 px-4 space-y-12 md:space-y-8 lg:space-y-10">
