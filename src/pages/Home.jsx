@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function Home() {
   const [data, setData] = useState(null);
@@ -10,7 +10,7 @@ export default function Home() {
         const json = await res.json();
         setData(json);
       } catch (err) {
-        console.error("Ошибка загрузки:", err);
+        console.error("Failed to fetch status:", err);
       }
     };
     fetchData();
@@ -18,34 +18,34 @@ export default function Home() {
     return () => clearInterval(i);
   }, []);
 
-  if (!data) return <p className="text-gray-400 text-center mt-10">Download...</p>;
+  if (!data) return <p className="text-gray-400 text-center mt-10">Loading...</p>;
 
   const { system, metrics, services, hardware } = data;
 
   const cpuDetails = [
-    hardware?.cpu?.model ? `Модель: ${hardware.cpu.model}` : null,
-    Number.isFinite(hardware?.cpu?.cores) ? `Потоков: ${hardware.cpu.cores}` : null,
+    hardware?.cpu?.model ? `Model: ${hardware.cpu.model}` : null,
+    Number.isFinite(hardware?.cpu?.cores) ? `Cores: ${hardware.cpu.cores}` : null,
   ].filter(Boolean);
 
   const totalMemory = hardware?.memory?.totalGB;
   const memoryDetails = [
-    Number.isFinite(totalMemory) ? `Всего: ${totalMemory} ГБ` : null,
+    Number.isFinite(totalMemory) ? `Total: ${totalMemory} GB` : null,
   ].filter(Boolean);
   const memUsagePercent = Number(metrics?.mem);
   if (Number.isFinite(totalMemory) && Number.isFinite(memUsagePercent)) {
     const usedMemory = Number(((memUsagePercent / 100) * totalMemory).toFixed(1));
-    memoryDetails.push(`Использовано: ${usedMemory} ГБ`);
+    memoryDetails.push(`Used: ${usedMemory} GB`);
   }
 
   const diskDetails = (hardware?.disks || []).map((disk) =>
-    `Диск ${disk.id}: ${disk.usedGB}/${disk.sizeGB} ГБ`
+    `Drive ${disk.id}: ${disk.usedGB}/${disk.sizeGB} GB`
   );
   const motherboardDetails = hardware?.motherboard
-    ? [`Плата: ${hardware.motherboard}`]
+    ? [`Board: ${hardware.motherboard}`]
     : [];
   const tempDetails = [];
   if (Number.isFinite(metrics?.temp)) {
-    tempDetails.push(`Сейчас: ${metrics.temp} °C`);
+    tempDetails.push(`Now: ${metrics.temp} °C`);
   }
   if (motherboardDetails.length > 0) {
     tempDetails.push(...motherboardDetails);
@@ -54,10 +54,10 @@ export default function Home() {
   }
 
   const hardwareGroups = [
-    { title: "Процессор", items: cpuDetails },
-    { title: "Память", items: memoryDetails },
-    { title: "Температуры", items: tempDetails },
-    { title: "Накопители", items: diskDetails },
+    { title: "Processor", items: cpuDetails },
+    { title: "Memory", items: memoryDetails },
+    { title: "Thermals", items: tempDetails },
+    { title: "Storage", items: diskDetails },
   ]
     .map((group) => ({
       ...group,
@@ -68,25 +68,60 @@ export default function Home() {
     .filter((group) => group.items.length > 0);
   const hasHardwareGroups = hardwareGroups.length > 0;
 
+  const desktopSummary = useMemo(() => {
+    const sanitize = (line) => {
+      if (typeof line !== "string") return null;
+      const [label, ...rest] = line.split(":");
+      if (rest.length === 0) {
+        return line.trim();
+      }
+      const value = rest.join(":").trim();
+      return value || line.trim();
+    };
+
+    return hardwareGroups
+      .map((group) => {
+        const headline = sanitize(group.items[0]);
+        if (!headline) return null;
+        return { title: group.title, value: headline };
+      })
+      .filter(Boolean);
+  }, [hardwareGroups]);
+
   return (
-    <div className="flex flex-col items-center text-center mt-12 px-4 space-y-10">
-      {/* ===== Секция: железо ===== */}
-      <section className="glass-panel p-8 max-w-4xl w-full text-left">
-        <h2 className="text-cyan-300 text-2xl font-bold mb-3 tracking-wide">System</h2>
-        <p className="text-slate-400 text-sm uppercase tracking-[0.2em]">
-          Uptime: {system.uptime}
-        </p>
+    <div className="flex flex-col items-center mt-12 px-4 space-y-12 md:space-y-8 lg:space-y-10">
+      {/* ===== System overview ===== */}
+      <section className="glass-panel p-8 max-w-5xl w-full text-left">
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <header className="space-y-3">
+            <p className="text-xs uppercase tracking-[0.42em] text-cyan-200/70">Home lab uptime</p>
+            <h2 className="text-cyan-100 text-3xl font-semibold tracking-wide">System overview</h2>
+            <p className="text-slate-300 text-base leading-relaxed">
+              Running for <span className="text-cyan-200 font-semibold">{system.uptime}</span> with live hardware
+              telemetry below.
+            </p>
+          </header>
+          {desktopSummary.length > 0 && (
+            <dl className="hidden md:grid md:grid-cols-2 gap-x-8 gap-y-4">
+              {desktopSummary.map((item) => (
+                <div key={item.title} className="flex flex-col gap-1">
+                  <dt className="text-[0.65rem] uppercase tracking-[0.3em] text-cyan-200/60">{item.title}</dt>
+                  <dd className="text-slate-50 text-base font-semibold leading-snug">{item.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
         {hasHardwareGroups && (
-          <div className="mt-6 space-y-4 md:hidden">
+          <div className="mt-8 grid gap-4 md:hidden">
             {hardwareGroups.map((group) => (
               <article
                 key={group.title}
-                className="rounded-3xl border border-cyan-400/15 bg-slate-900/40 px-5 py-4 shadow-[0_18px_40px_rgba(8,15,35,0.45)] backdrop-blur"
-              >
-                <h3 className="text-slate-200 text-sm font-semibold tracking-[0.24em] uppercase">
+                className="rounded-3xl border border-cyan-400/15 bg-slate-900/50 px-5 py-5 shadow-[0_18px_40px_rgba(8,15,35,0.4)] backdrop-blur">
+                <h3 className="text-slate-200 text-sm font-semibold tracking-[0.28em] uppercase">
                   {group.title}
                 </h3>
-                <ul className="mt-2 space-y-1 text-slate-300 text-sm">
+                <ul className="mt-3 space-y-1.5 text-slate-300 text-sm leading-relaxed">
                   {group.items.map((line, idx) => (
                     <li key={idx}>{line}</li>
                   ))}
@@ -97,7 +132,7 @@ export default function Home() {
         )}
       </section>
 
-      {/* ===== Секция: ресурсы ===== */}
+      {/* ===== Live metrics ===== */}
       <section className="grid md:grid-cols-4 gap-6 w-full max-w-5xl">
         <Stat
           label="CPU"
@@ -121,7 +156,7 @@ export default function Home() {
           details={tempDetails}
         />
         <Stat
-          label="Disk"
+          label="Storage"
           value={metrics.disk}
           color="bg-green-500"
           unit="%"
@@ -129,9 +164,9 @@ export default function Home() {
         />
       </section>
 
-      {/* ===== Секция: сервисы ===== */}
+      {/* ===== Services ===== */}
       <section className="glass-panel p-8 w-full max-w-5xl text-left">
-        <h3 className="text-cyan-300 text-2xl font-bold mb-6 tracking-wide">Сервисы</h3>
+        <h3 className="text-cyan-100 text-2xl font-semibold mb-6 tracking-wide">Services</h3>
         <div className="grid md:grid-cols-2 gap-4 text-slate-200">
           {services.map((s) => (
             <Service key={s.name} {...s} />
@@ -164,17 +199,17 @@ function Stat({ label, value, color, unit, details = [] }) {
   });
 
   const popoverCopy = {
-    CPU: "Параметры процессора",
-    Memory: "Использование памяти",
-    Temp: "Температура и плата",
-    Disk: "Состояние накопителей",
+    CPU: "Processor details",
+    Memory: "Memory utilisation",
+    Temp: "Thermal snapshot",
+    Storage: "Storage usage",
   };
 
   const popoverIcon = {
     CPU: "🧠",
     Memory: "💾",
     Temp: "🌡️",
-    Disk: "💽",
+    Storage: "🗄️",
   };
 
   return (
@@ -206,7 +241,7 @@ function Stat({ label, value, color, unit, details = [] }) {
             <div>
               <p className="text-[0.7rem] uppercase tracking-[0.26em] text-cyan-200/80">{label}</p>
               <p className="text-sm font-semibold text-slate-50">
-                {popoverCopy[label] ?? "Дополнительные сведения"}
+                {popoverCopy[label] ?? "Additional details"}
               </p>
             </div>
           </header>
@@ -245,14 +280,14 @@ function Service({ name, online, responseTime, players, supportsPlayers }) {
     }
 
     if (!online) {
-      return "Игроки: сервер недоступен";
+      return "Players: server unavailable";
     }
 
     if (hasPlayers) {
-      return `Игроки: ${playerCount}`;
+      return `Players: ${playerCount}`;
     }
 
-    return "Игроки: данные недоступны";
+    return "Players: data unavailable";
   };
 
   return (
@@ -265,7 +300,7 @@ function Service({ name, online, responseTime, players, supportsPlayers }) {
         <p className="mt-2 text-slate-300 text-sm font-medium">{renderPlayersInfo()}</p>
       )}
       {supportsPlayers && online && playerNames.length > 0 && (
-        <p className="mt-1 text-slate-400 text-xs">Онлайн: {playerNames.join(", ")}</p>
+        <p className="mt-1 text-slate-400 text-xs">Online: {playerNames.join(", ")}</p>
       )}
     </div>
   );

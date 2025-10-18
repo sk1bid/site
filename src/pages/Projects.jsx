@@ -3,25 +3,25 @@ import { useState } from "react";
 const projects = [
   {
     name: "GymAssistant",
-    desc: "Телеграм-бот для расписания тренировок на PostgreSQL + asyncpg",
+    desc: "Telegram bot for gym scheduling powered by PostgreSQL + asyncpg",
     glow: "rgba(56, 189, 248, 0.55)",
     href: "https://github.com/sk1bid/gymassistant",
-    cta: "Открыть репозиторий",
+    cta: "View repository",
   },
   {
     name: "Factorio Server",
-    desc: "Dockerized сервер с автосейвами и RCON",
+    desc: "Dockerized server with automated saves and RCON management",
     glow: "rgba(251, 191, 36, 0.45)",
   },
   {
     name: "Minecraft Server",
-    desc: "Kubernetes-деплой Minecraft с NodePort",
+    desc: "Kubernetes-hosted Minecraft using NodePort networking",
     glow: "rgba(45, 212, 191, 0.45)",
     copy: "mc.sk1bid.ru",
   },
   {
     name: "Monitoring Stack",
-    desc: "Prometheus + Grafana + Loki (в разработке)",
+    desc: "Prometheus + Grafana + Loki (in progress)",
     glow: "rgba(192, 132, 252, 0.5)",
   },
 ];
@@ -35,16 +35,16 @@ export default function Projects() {
       setCopiedProject(projectName);
       setTimeout(() => setCopiedProject(null), 2200);
     } catch (error) {
-      console.error("Не удалось скопировать домен", error);
+      console.error("Unable to copy domain", error);
     }
   };
 
   return (
     <div className="px-6 py-16 flex flex-col items-center space-y-12">
       <div className="glass-panel max-w-3xl w-full px-10 py-8 text-center">
-        <h2 className="text-3xl font-bold text-cyan-300 tracking-wide">Мои проекты</h2>
+        <h2 className="text-3xl font-bold text-cyan-300 tracking-wide">Projects</h2>
         <p className="mt-4 text-sm text-slate-300">
-          Подборка сервисов и экспериментов, которые я поддерживаю и развиваю в своём домашнем кластере.
+          A collection of services and experiments that I maintain and iterate on inside my home lab cluster.
         </p>
       </div>
       <div className="grid md:grid-cols-2 gap-8 max-w-4xl w-full">
@@ -70,7 +70,7 @@ export default function Projects() {
                   className="glass-chip copy-chip mt-6 inline-flex items-center gap-2"
                 >
                   <span className="copy-dot" aria-hidden />
-                  {copiedProject === p.name ? "Скопировано!" : `Скопировать ${p.copy}`}
+                  {copiedProject === p.name ? "Copied!" : `Copy ${p.copy}`}
                 </button>
               )}
             </article>
@@ -83,7 +83,7 @@ export default function Projects() {
               target="_blank"
               rel="noopener noreferrer"
               className="project-link"
-              aria-label={`${p.name}: открыть в новой вкладке`}
+              aria-label={`${p.name}: open in a new tab`}
             >
               {cardContent}
             </a>
