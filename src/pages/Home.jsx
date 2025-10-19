@@ -139,9 +139,11 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col items-center mt-12 px-4 space-y-12 md:space-y-8 lg:space-y-10">
+    <div
+      className="flex flex-col items-center mt-12 px-4 space-y-12 md:space-y-8 lg:mx-auto lg:max-w-6xl lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:gap-8 lg:space-y-0"
+    >
       {/* ===== System overview ===== */}
-      <section className="glass-panel p-8 max-w-5xl w-full text-left">
+      <section className="glass-panel p-8 max-w-5xl w-full text-left lg:col-start-1 lg:row-start-1 lg:max-w-none">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <header className="space-y-3">
             <p className="text-xs uppercase tracking-[0.42em] text-cyan-200/70">Home lab uptime</p>
@@ -183,47 +185,45 @@ export default function Home() {
       </section>
 
       {/* ===== Live metrics + services ===== */}
-      <div className="w-full max-w-5xl grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
-        <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-          <Stat
-            label="CPU"
-            value={metrics.cpu}
-            color="bg-cyan-500"
-            unit="%"
-            details={cpuDetails}
-          />
-          <Stat
-            label="Memory"
-            value={metrics.mem}
-            color="bg-purple-500"
-            unit="%"
-            details={memoryDetails}
-          />
-          <Stat
-            label="Temp"
-            value={metrics.temp}
-            color="bg-orange-500"
-            unit="°C"
-            details={tempDetails}
-          />
-          <Stat
-            label="Storage"
-            value={metrics.disk}
-            color="bg-green-500"
-            unit="%"
-            details={diskDetails}
-          />
-        </section>
+      <section className="grid w-full max-w-5xl gap-6 md:grid-cols-2 lg:col-span-2 lg:row-start-2 lg:max-w-none lg:grid-cols-4">
+        <Stat
+          label="CPU"
+          value={metrics.cpu}
+          color="bg-cyan-500"
+          unit="%"
+          details={cpuDetails}
+        />
+        <Stat
+          label="Memory"
+          value={metrics.mem}
+          color="bg-purple-500"
+          unit="%"
+          details={memoryDetails}
+        />
+        <Stat
+          label="Temp"
+          value={metrics.temp}
+          color="bg-orange-500"
+          unit="°C"
+          details={tempDetails}
+        />
+        <Stat
+          label="Storage"
+          value={metrics.disk}
+          color="bg-green-500"
+          unit="%"
+          details={diskDetails}
+        />
+      </section>
 
-        <section className="glass-panel p-6 lg:p-8 text-left">
-          <h3 className="text-cyan-100 text-2xl font-semibold mb-5 tracking-wide">Services</h3>
-          <div className="grid gap-4 text-slate-200 sm:grid-cols-2">
-            {services.map((s) => (
-              <Service key={s.name} {...s} />
-            ))}
-          </div>
-        </section>
-      </div>
+      <section className="glass-panel p-6 w-full max-w-5xl text-left lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:flex lg:h-full lg:max-w-none lg:flex-col lg:p-8">
+        <h3 className="text-cyan-100 text-2xl font-semibold mb-5 tracking-wide">Services</h3>
+        <div className="grid gap-4 text-slate-200 sm:grid-cols-2 lg:flex-1">
+          {services.map((s) => (
+            <Service key={s.name} {...s} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
