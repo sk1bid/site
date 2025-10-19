@@ -101,7 +101,7 @@ export default function Home() {
   const hardwareGroups = [
     { title: "Processor", items: cpuDetails },
     { title: "Memory", items: memoryDetails },
-    { title: "Thermals", items: tempDetails },
+    { title: "Motherboard", items: tempDetails },
     { title: "Storage", items: diskDetails },
   ]
     .map((group) => ({
@@ -139,85 +139,92 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col items-center mt-12 px-4 space-y-12 md:space-y-8 lg:space-y-10">
-      {/* ===== System overview ===== */}
-      <section className="glass-panel p-8 max-w-5xl w-full text-left">
-        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <header className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.42em] text-cyan-200/70">Home lab uptime</p>
-            <h2 className="text-cyan-100 text-3xl font-semibold tracking-wide">System overview</h2>
-            <p className="text-slate-300 text-base leading-relaxed">
-              Running for <span className="text-cyan-200 font-semibold">{system.uptime}</span> with live hardware
-              telemetry below.
-            </p>
-          </header>
-          {desktopSummary.length > 0 && (
-            <dl className="hidden md:grid md:grid-cols-2 gap-x-8 gap-y-4">
-              {desktopSummary.map((item) => (
-                <div key={item.title} className="flex flex-col gap-1">
-                  <dt className="text-[0.65rem] uppercase tracking-[0.3em] text-cyan-200/60">{item.title}</dt>
-                  <dd className="text-slate-50 text-base font-semibold leading-snug">{item.value}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </div>
-        {hasHardwareGroups && (
-          <div className="mt-8 grid gap-4 md:hidden">
-            {hardwareGroups.map((group) => (
-              <article
-                key={group.title}
-                className="rounded-3xl border border-cyan-400/15 bg-slate-900/50 px-5 py-5 shadow-[0_18px_40px_rgba(8,15,35,0.4)] backdrop-blur">
-                <h3 className="text-slate-200 text-sm font-semibold tracking-[0.28em] uppercase">
-                  {group.title}
-                </h3>
-                <ul className="mt-3 space-y-1.5 text-slate-300 text-sm leading-relaxed">
-                  {group.items.map((line, idx) => (
-                    <li key={idx}>{line}</li>
+    <div className="mt-12 px-4 pb-16">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start">
+        <div className="flex flex-col gap-8">
+          {/* ===== System overview ===== */}
+          <section className="glass-panel w-full p-6 text-left md:p-8">
+            <header className="space-y-5">
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-[0.42em] text-cyan-200/70">Home lab uptime</p>
+                <h2 className="text-cyan-100 text-3xl font-semibold tracking-wide">System overview</h2>
+                <p className="text-slate-300 text-base leading-relaxed">
+                  Running for <span className="text-cyan-200 font-semibold">{system.uptime}</span> with live hardware telemetry below.
+                </p>
+              </div>
+              {desktopSummary.length > 0 && (
+                <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {desktopSummary.map((item) => (
+                    <div key={item.title} className="rounded-2xl border border-cyan-300/10 bg-slate-900/60 px-4 py-3">
+                      <dt className="text-[0.65rem] uppercase tracking-[0.3em] text-cyan-200/60">{item.title}</dt>
+                      <dd className="mt-1 text-slate-50 text-base font-semibold leading-snug">{item.value}</dd>
+                    </div>
                   ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+                </dl>
+              )}
+            </header>
+            {hasHardwareGroups && (
+              <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                {hardwareGroups.map((group) => (
+                  <article
+                    key={group.title}
+                    className="rounded-3xl border border-cyan-400/15 bg-slate-900/50 px-5 py-5 shadow-[0_18px_40px_rgba(8,15,35,0.4)] backdrop-blur"
+                  >
+                    <h3 className="text-slate-200 text-sm font-semibold tracking-[0.28em] uppercase">{group.title}</h3>
+                    <ul className="mt-3 space-y-1.5 text-slate-300 text-sm leading-relaxed">
+                      {group.items.map((line, idx) => (
+                        <li key={idx}>{line}</li>
+                      ))}
+                    </ul>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
 
-      {/* ===== Live metrics + services ===== */}
-      <div className="w-full max-w-5xl grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
-        <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-          <Stat
-            label="CPU"
-            value={metrics.cpu}
-            color="bg-cyan-500"
-            unit="%"
-            details={cpuDetails}
-          />
-          <Stat
-            label="Memory"
-            value={metrics.mem}
-            color="bg-purple-500"
-            unit="%"
-            details={memoryDetails}
-          />
-          <Stat
-            label="Temp"
-            value={metrics.temp}
-            color="bg-orange-500"
-            unit="°C"
-            details={tempDetails}
-          />
-          <Stat
-            label="Storage"
-            value={metrics.disk}
-            color="bg-green-500"
-            unit="%"
-            details={diskDetails}
-          />
-        </section>
+          {/* ===== Live metrics ===== */}
+          <section className="glass-panel w-full p-6 text-left md:p-8">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+              <h3 className="text-cyan-100 text-2xl font-semibold tracking-wide">Live metrics</h3>
+              <p className="text-xs uppercase tracking-[0.32em] text-cyan-200/60">Updated every 5s</p>
+            </div>
+            <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-2">
+              <Stat
+                label="CPU"
+                value={metrics.cpu}
+                color="bg-cyan-500"
+                unit="%"
+                details={cpuDetails}
+              />
+              <Stat
+                label="Memory"
+                value={metrics.mem}
+                color="bg-purple-500"
+                unit="%"
+                details={memoryDetails}
+              />
+              <Stat
+                label="Temp"
+                value={metrics.temp}
+                color="bg-orange-500"
+                unit="°C"
+                details={tempDetails}
+              />
+              <Stat
+                label="Storage"
+                value={metrics.disk}
+                color="bg-green-500"
+                unit="%"
+                details={diskDetails}
+              />
+            </div>
+          </section>
+        </div>
 
-        <section className="glass-panel p-6 lg:p-8 text-left">
-          <h3 className="text-cyan-100 text-2xl font-semibold mb-5 tracking-wide">Services</h3>
-          <div className="grid gap-4 text-slate-200 sm:grid-cols-2">
+        <section className="glass-panel w-full p-6 text-left md:sticky md:top-24 md:p-8">
+          <h3 className="text-cyan-100 text-2xl font-semibold tracking-wide">Services</h3>
+          <p className="mt-2 text-sm text-slate-400">Quick glance at availability and latency across your stack.</p>
+          <div className="mt-6 grid gap-4 text-slate-200 sm:grid-cols-2 lg:grid-cols-1">
             {services.map((s) => (
               <Service key={s.name} {...s} />
             ))}
@@ -268,7 +275,7 @@ function Stat({ label, value, color, unit, details = [] }) {
   return (
     <div className="group relative md:hover:z-40 md:focus-within:z-40">
       <div
-        className={`glass-panel stat-card p-6 text-left transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`glass-panel stat-card h-full p-6 text-left transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           hasDetails
             ? "md:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 md:hover:-translate-y-3 focus-visible:-translate-y-3"
             : ""
@@ -348,7 +355,7 @@ function Service({ name, online, responseTime, players, supportsPlayers }) {
   };
 
   return (
-    <div className="glass-chip px-4 py-4 text-left">
+    <div className="glass-chip h-full px-4 py-4 text-left">
       <div className="flex items-center justify-between gap-3">
         <span className="font-semibold tracking-wide text-slate-100">{name}</span>
         <span className={online ? "text-emerald-300" : "text-rose-400"}>{statusText}</span>
