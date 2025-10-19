@@ -101,7 +101,7 @@ export default function Home() {
   const hardwareGroups = [
     { title: "Processor", items: cpuDetails },
     { title: "Memory", items: memoryDetails },
-    { title: "Thermals", items: tempDetails },
+    { title: "Motherboard", items: tempDetails },
     { title: "Storage", items: diskDetails },
   ]
     .map((group) => ({
